@@ -17,6 +17,7 @@ variable "repository_owner" {
 variable "release" {
   description = "Release configuration"
   type        = any
+  default     = {}
 }
 variable "cluster_name" {
   description = "Name of the EKS cluster"
@@ -46,7 +47,7 @@ variable "values_file" {
   type        = string
 }
 
-variable "values" {
+variable "values_overrides" {
   description = "Values to be passed to the Helm chart"
   type        = any
 }
@@ -55,4 +56,16 @@ variable "absolute_path" {
   description = "Absolute path of the current directory"
   type        = string
   default     = "."
+}
+
+variable "config_map" {
+  description = "ConfigMap to be created"
+  type        = any
+  default     = {}
+}
+
+variable "secrets" {
+  description = "Secrets to be pulled from AWS Secrets Manager"
+  type        = any
+  default     = {}
 }

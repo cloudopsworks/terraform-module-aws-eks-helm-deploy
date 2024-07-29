@@ -17,14 +17,14 @@ resource "helm_release" "repo" {
   repository = var.helm_repo_url
   namespace  = data.kubernetes_namespace.this.metadata.0.name
   version    = var.release.version
-  wait       = false
+  wait       = true
 
   values = [
     file(var.values_file)
   ]
 
   dynamic "set" {
-    for_each = var.values
+    for_each = var.values_overrides
 
     content {
       name  = set.key
@@ -47,17 +47,16 @@ resource "helm_release" "repo" {
 resource "helm_release" "default" {
   count     = var.helm_repo_url == "" ? 1 : 0
   name      = var.release.name
-  chart     = var.helm_chart_path != "" ? var.helm_chart_path : "${var.absolute_path}/helm"
+  chart     = var.helm_chart_path != "" ? "${var.absolute_path}/helm" : var.helm_chart_path
   namespace = data.kubernetes_namespace.this.metadata.0.name
-  version   = var.release.version
-  wait      = false
+  wait      = true
 
   values = [
     file(var.values_file)
   ]
 
   dynamic "set" {
-    for_each = var.values
+    for_each = var.values_overrides
 
     content {
       name  = set.key

@@ -9,10 +9,10 @@ variable "namespace" {
   type        = string
 }
 
-variable "repository_owner" {
-  description = "Owner of the repository"
-  type        = string
-}
+# variable "repository_owner" {
+#   description = "Owner of the repository"
+#   type        = string
+# }
 
 variable "release" {
   description = "Release configuration"

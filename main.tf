@@ -21,7 +21,7 @@ resource "helm_release" "repo" {
   wait             = true
 
   values = [
-    file(var.values_file)
+    file("${var.absolute_path}/${var.values_file}")
   ]
 
   dynamic "set" {

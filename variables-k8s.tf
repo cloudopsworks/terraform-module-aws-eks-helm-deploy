@@ -50,6 +50,7 @@ variable "values_file" {
 variable "values_overrides" {
   description = "Values to be passed to the Helm chart"
   type        = any
+  default     = {}
 }
 
 variable "absolute_path" {

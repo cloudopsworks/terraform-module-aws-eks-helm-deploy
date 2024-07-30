@@ -11,13 +11,14 @@ data "kubernetes_namespace" "this" {
 }
 
 resource "helm_release" "repo" {
-  count      = var.helm_repo_url != "" ? 1 : 0
-  name       = var.release.name
-  chart      = var.helm_chart_name
-  repository = var.helm_repo_url
-  namespace  = data.kubernetes_namespace.this.metadata.0.name
-  version    = var.release.version
-  wait       = true
+  count            = var.helm_repo_url != "" ? 1 : 0
+  name             = var.release.name
+  chart            = var.helm_chart_name
+  repository       = var.helm_repo_url
+  namespace        = data.kubernetes_namespace.this.metadata.0.name
+  create_namespace = var.create_namespace
+  version          = var.release.version
+  wait             = true
 
   values = [
     file(var.values_file)

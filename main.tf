@@ -5,6 +5,7 @@
 #
 
 data "kubernetes_namespace" "this" {
+  count = var.create_namespace ? 0 : 1
   metadata {
     name = var.namespace
   }
@@ -15,7 +16,7 @@ resource "helm_release" "repo" {
   name             = var.release.name
   chart            = var.helm_chart_name
   repository       = var.helm_repo_url
-  namespace        = data.kubernetes_namespace.this.metadata.0.name
+  namespace        = var.create_namespace ? var.namespace : data.kubernetes_namespace.this[0].metadata.0.name
   create_namespace = var.create_namespace
   version          = var.release.version
   wait             = true
@@ -46,11 +47,12 @@ resource "helm_release" "repo" {
 }
 
 resource "helm_release" "default" {
-  count     = var.helm_repo_url == "" ? 1 : 0
-  name      = var.release.name
-  chart     = var.helm_chart_path != "" ? "${var.absolute_path}/helm" : var.helm_chart_path
-  namespace = data.kubernetes_namespace.this.metadata.0.name
-  wait      = true
+  count            = var.helm_repo_url == "" ? 1 : 0
+  name             = var.release.name
+  chart            = var.helm_chart_path != "" ? "${var.absolute_path}/helm" : var.helm_chart_path
+  namespace        = var.create_namespace ? var.namespace : data.kubernetes_namespace.this[0].metadata.0.name
+  create_namespace = var.create_namespace
+  wait             = true
 
   values = [
     file(var.values_file)

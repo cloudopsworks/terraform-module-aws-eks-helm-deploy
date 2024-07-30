@@ -19,10 +19,10 @@ variable "release" {
   type        = any
   default     = {}
 }
-variable "cluster_name" {
-  description = "Name of the EKS cluster"
-  type        = string
-}
+# variable "cluster_name" {
+#   description = "Name of the EKS cluster"
+#   type        = string
+# }
 
 variable "helm_repo_url" {
   description = "URL of the Helm repository"

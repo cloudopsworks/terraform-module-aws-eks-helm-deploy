@@ -18,7 +18,7 @@ resource "helm_release" "repo" {
   repository       = var.helm_repo_url
   namespace        = var.create_namespace ? var.namespace : data.kubernetes_namespace.this[0].metadata.0.name
   create_namespace = var.create_namespace
-  version          = startswith(var.helm_repo_url, "oci") ? "" : var.release.version
+  version          = startswith(var.helm_repo_url, "oci") ? null : try(var.release.version, null)
   wait             = true
 
   values = [

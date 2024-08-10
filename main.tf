@@ -14,7 +14,7 @@ data "kubernetes_namespace" "this" {
 resource "helm_release" "repo" {
   count            = var.helm_repo_url != "" ? 1 : 0
   name             = var.release.name
-  chart            = startswith(var.helm_repo_url, "oci") ? "" : var.helm_chart_name
+  chart            = var.helm_chart_name
   repository       = var.helm_repo_url
   namespace        = var.create_namespace ? var.namespace : data.kubernetes_namespace.this[0].metadata.0.name
   create_namespace = var.create_namespace

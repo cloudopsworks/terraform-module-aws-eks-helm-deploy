@@ -49,7 +49,7 @@ resource "helm_release" "repo" {
 resource "helm_release" "default" {
   count            = var.helm_repo_url == "" ? 1 : 0
   name             = var.release.name
-  chart            = var.helm_chart_path == "" ? "${var.absolute_path}/helm" : var.helm_chart_path
+  chart            = var.helm_chart_path == "" ? "${var.absolute_path}/helm/charts" : var.helm_chart_path
   namespace        = var.create_namespace ? var.namespace : data.kubernetes_namespace.this[0].metadata.0.name
   create_namespace = var.create_namespace
   wait             = true

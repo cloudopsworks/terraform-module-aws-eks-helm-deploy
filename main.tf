@@ -4,6 +4,13 @@
 #            Distributed Under Apache v2.0 License
 #
 
+locals {
+  secrets_overrides = length(var.secrets.secrets_path_filter) > 0 ? {
+    "envFrom.secretsRef[0].name" = kubernetes_secret.secrets[0].metadata[0].name
+  } : {}
+  all_overrides = merge(var.values_overrides, local.secrets_overrides)
+}
+
 data "kubernetes_namespace" "this" {
   count = var.create_namespace ? 0 : 1
   metadata {
@@ -26,7 +33,7 @@ resource "helm_release" "repo" {
   ]
 
   dynamic "set" {
-    for_each = var.values_overrides
+    for_each = local.all_overrides
 
     content {
       name  = set.key
@@ -59,7 +66,7 @@ resource "helm_release" "default" {
   ]
 
   dynamic "set" {
-    for_each = var.values_overrides
+    for_each = local.all_overrides
 
     content {
       name  = set.key

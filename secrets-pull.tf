@@ -28,7 +28,8 @@ data "aws_secretsmanager_secret_version" "secret" {
   secret_id = each.value.secret_id
 }
 
-resource "kubernetes_secret" "app_secrets" {
+resource "kubernetes_secret" "secrets" {
+  count = length(var.secrets.secrets_path_filter) > 0 ? 1 : 0
   metadata {
     name      = var.release.name
     namespace = var.namespace

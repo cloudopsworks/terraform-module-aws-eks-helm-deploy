@@ -6,7 +6,7 @@
 
 locals {
   secrets_overrides = length(var.secrets.secrets_path_filter) > 0 ? {
-    "envFrom.secretRef[0].name" = kubernetes_secret.secrets[0].metadata[0].name
+    "envFrom[0].secretRef.name" = kubernetes_secret.secrets[0].metadata[0].name
   } : {}
   all_overrides = merge(var.values_overrides, local.secrets_overrides)
 }

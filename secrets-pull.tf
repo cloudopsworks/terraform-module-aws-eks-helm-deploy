@@ -15,7 +15,7 @@ data "aws_secretsmanager_secrets" "secrets" {
 locals {
   secrets_map = merge([
     for prefix in toset(var.secrets.secrets_path_filter) : {
-      for secret_name in data.aws_secretsmanager_secrets.secrets[prefix].names : replace(secret_name, "${prefix}/", "") => {
+      for secret_name in data.aws_secretsmanager_secrets.secrets[prefix].names : replace(replace(secret_name, "/", "|"), replace("${prefix}/", "/", "|"), "") => {
         secret_id = secret_name
         prefix    = prefix
       }

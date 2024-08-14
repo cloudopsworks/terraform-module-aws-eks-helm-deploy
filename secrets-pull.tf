@@ -5,7 +5,7 @@
 #
 
 data "aws_secretsmanager_secrets" "secrets" {
-  for_each = toset(var.secrets.secrets_path_filter)
+  for_each = toset(local.secrets_path_filter)
   filter {
     name   = "name"
     values = [each.value]
@@ -14,7 +14,7 @@ data "aws_secretsmanager_secrets" "secrets" {
 
 locals {
   secrets_map = merge([
-    for prefix in toset(var.secrets.secrets_path_filter) : {
+    for prefix in toset(local.secrets_path_filter) : {
       for secret_name in data.aws_secretsmanager_secrets.secrets[prefix].names : replace(replace(secret_name, "/", "|"), replace("${prefix}/", "/", "|"), "") => {
         secret_id = secret_name
         prefix    = prefix
@@ -29,7 +29,7 @@ data "aws_secretsmanager_secret_version" "secret" {
 }
 
 resource "kubernetes_secret" "secrets" {
-  count = length(var.secrets.secrets_path_filter) > 0 ? 1 : 0
+  count = length(local.secrets_path_filter) > 0 ? 1 : 0
   metadata {
     name      = var.release.name
     namespace = var.namespace

@@ -76,3 +76,9 @@ variable "create_namespace" {
   type        = bool
   default     = false
 }
+
+variable "namespace_annotations" {
+  description = "Annotations for the namespace"
+  type        = any
+  default     = {}
+}

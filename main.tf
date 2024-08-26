@@ -15,7 +15,13 @@ locals {
 resource "kubernetes_namespace" "this" {
   count = var.create_namespace ? 1 : 0
   metadata {
-    name = var.namespace
+    name        = var.namespace
+    annotations = var.namespace_annotations
+    labels = {
+      "app.kubernetes.io/name"       = var.release.name
+      "app.kubernetes.io/version"    = var.release.version
+      "app.kubernetes.io/managed-by" = "Terraform"
+    }
   }
 }
 
@@ -24,6 +30,16 @@ data "kubernetes_namespace" "this" {
   metadata {
     name = var.namespace
   }
+}
+
+resource "kubernetes_annotations" "ns_annotations" {
+  api_version = "v1"
+  kind        = "Namespace"
+  count       = var.create_namespace ? 0 : 1
+  metadata {
+    name = var.namespace
+  }
+  annotations = var.namespace_annotations
 }
 
 resource "helm_release" "repo" {

@@ -12,6 +12,13 @@ locals {
   all_overrides = merge(var.values_overrides, local.secrets_overrides)
 }
 
+resource "kubernetes_namespace" "this" {
+  count = var.create_namespace ? 1 : 0
+  metadata {
+    name = var.namespace
+  }
+}
+
 data "kubernetes_namespace" "this" {
   count = var.create_namespace ? 0 : 1
   metadata {
@@ -24,7 +31,7 @@ resource "helm_release" "repo" {
   name             = var.release.name
   chart            = var.helm_chart_name
   repository       = var.helm_repo_url
-  namespace        = var.create_namespace ? var.namespace : data.kubernetes_namespace.this[0].metadata.0.name
+  namespace        = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
   create_namespace = var.create_namespace
   version          = startswith(var.helm_repo_url, "oci") ? null : try(var.release.version, null)
   wait             = true

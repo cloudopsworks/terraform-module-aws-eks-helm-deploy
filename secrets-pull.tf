@@ -31,7 +31,7 @@ data "aws_secretsmanager_secret_version" "secret" {
 resource "kubernetes_secret" "secrets" {
   count = length(local.secrets_path_filter) > 0 ? 1 : 0
   metadata {
-    name      = var.release.name
+    name      = "${var.release.name}-injected-secrets"
     namespace = var.namespace
   }
   data = {

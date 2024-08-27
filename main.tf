@@ -19,7 +19,7 @@ resource "kubernetes_namespace" "this" {
     annotations = var.namespace_annotations
     labels = {
       "app.kubernetes.io/name"       = var.release.name
-      "app.kubernetes.io/version"    = var.release.version
+      "app.kubernetes.io/version"    = var.release.source.version
       "app.kubernetes.io/managed-by" = "Terraform"
     }
   }
@@ -49,7 +49,7 @@ resource "helm_release" "repo" {
   repository       = var.helm_repo_url
   namespace        = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
   create_namespace = var.create_namespace
-  version          = startswith(var.helm_repo_url, "oci") ? null : try(var.release.version, null)
+  version          = startswith(var.helm_repo_url, "oci") ? null : try(var.release.source.version, null)
   wait             = true
 
   values = [

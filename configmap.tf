@@ -7,7 +7,7 @@
 locals {
   config_path          = var.absolute_path == "" ? format("%s/%s", "values", var.release.name) : format("%s/%s/%s", var.absolute_path, "values", var.release.name)
   files_in_config_path = try(var.config_map.enabled, false) == true ? fileset(local.config_path, "*") : []
-  mount_overrides = try(var.config_map.mount_point, "") != "" ? {
+  mount_overrides = try(var.config_map.mount_point, "") != "" && try(var.config_map.enabled, false) == true ? {
     "injectedVolumes[0].name"           = "${var.release.name}-injected-cm"
     "injectedVolumes[0].configMap.name" = "${var.release.name}-injected-cm"
     "injectedVolumeMounts[0].name"      = "${var.release.name}-injected-cm"

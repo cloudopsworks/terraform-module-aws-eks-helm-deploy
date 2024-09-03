@@ -9,7 +9,10 @@ locals {
   secrets_overrides = length(local.secrets_path_filter) > 0 ? {
     "injectEnvFrom[0].secretRef.name" = kubernetes_secret.secrets[0].metadata[0].name
   } : {}
-  all_overrides = merge(var.values_overrides, local.secrets_overrides, local.mount_overrides)
+  all_overrides   = merge(var.values_overrides, local.secrets_overrides, local.mount_overrides)
+  source_version  = try(var.release.source.version, "")
+  app_version     = try(var.release.version, "")
+  release_version = coalesce(local.source_version, local.app_version, "NA")
 }
 
 resource "kubernetes_namespace" "this" {
@@ -19,7 +22,7 @@ resource "kubernetes_namespace" "this" {
     annotations = var.namespace_annotations
     labels = {
       "app.kubernetes.io/name"       = var.release.name
-      "app.kubernetes.io/version"    = var.release.source.version
+      "app.kubernetes.io/version"    = local.release_version
       "app.kubernetes.io/managed-by" = "Terraform"
     }
   }
@@ -49,7 +52,7 @@ resource "helm_release" "repo" {
   repository       = var.helm_repo_url
   namespace        = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
   create_namespace = var.create_namespace
-  version          = startswith(var.helm_repo_url, "oci") ? null : try(var.release.source.version, null)
+  version          = startswith(var.helm_repo_url, "oci") || local.release_version == "NA" ? null : local.release_version
   wait             = true
 
   values = [

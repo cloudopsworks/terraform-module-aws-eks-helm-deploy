@@ -18,15 +18,40 @@ locals {
 resource "kubernetes_namespace" "this" {
   count = var.create_namespace ? 1 : 0
   metadata {
-    name        = var.namespace
-    annotations = var.namespace_annotations
-    labels = {
-      "app.kubernetes.io/name"       = var.release.name
-      "app.kubernetes.io/version"    = local.release_version
-      "app.kubernetes.io/managed-by" = "Terraform"
-    }
+    name = var.namespace
+  }
+  lifecycle {
+    ignore_changes = [
+      metadata[0].annotations,
+      metadata[0].labels
+    ]
   }
 }
+
+resource "kubernetes_labels" "this" {
+  count       = var.create_namespace ? 1 : 0
+  api_version = "v1"
+  kind        = "Namespace"
+  metadata {
+    name = kubernetes_namespace.this[count.index].metadata[0].name
+  }
+  labels = {
+    "app.kubernetes.io/name"       = var.release.name
+    "app.kubernetes.io/version"    = local.release_version
+    "app.kubernetes.io/managed-by" = "Terraform"
+  }
+}
+
+resource "kubernetes_annotations" "this" {
+  count       = var.create_namespace ? 1 : 0
+  api_version = "v1"
+  kind        = "Namespace"
+  metadata {
+    name = kubernetes_namespace.this[count.index].metadata[0].name
+  }
+  annotations = var.namespace_annotations
+}
+
 
 data "kubernetes_namespace" "this" {
   count = var.create_namespace ? 0 : 1
@@ -36,14 +61,29 @@ data "kubernetes_namespace" "this" {
 }
 
 resource "kubernetes_annotations" "ns_annotations" {
+  count       = var.create_namespace ? 0 : 1
   api_version = "v1"
   kind        = "Namespace"
-  count       = var.create_namespace ? 0 : 1
   metadata {
-    name = var.namespace
+    name = data.kubernetes_namespace.this[count.index].metadata[0].name
   }
   annotations = var.namespace_annotations
 }
+
+resource "kubernetes_labels" "ns_labels" {
+  count       = var.create_namespace ? 0 : 1
+  api_version = "v1"
+  kind        = "Namespace"
+  metadata {
+    name = data.kubernetes_namespace.this[count.index].metadata[0].name
+  }
+  labels = {
+    "app.kubernetes.io/name"       = var.release.name
+    "app.kubernetes.io/version"    = local.release_version
+    "app.kubernetes.io/managed-by" = "Terraform"
+  }
+}
+
 
 resource "helm_release" "repo" {
   count            = var.helm_repo_url != "" ? 1 : 0

@@ -28,5 +28,6 @@ resource "kubernetes_config_map" "config_map" {
   }
   data = {
     for file in local.files_in_config_path : file => file("${local.config_path}/${file}")
+    if !contains([".empty", ".placeholder"], file)
   }
 }

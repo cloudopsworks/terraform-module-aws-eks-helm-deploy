@@ -64,6 +64,7 @@ resource "kubernetes_annotations" "ns_annotations" {
   count       = var.create_namespace ? 0 : 1
   api_version = "v1"
   kind        = "Namespace"
+  force       = true
   metadata {
     name = data.kubernetes_namespace.this[count.index].metadata[0].name
   }
@@ -74,6 +75,7 @@ resource "kubernetes_labels" "ns_labels" {
   count       = var.create_namespace ? 0 : 1
   api_version = "v1"
   kind        = "Namespace"
+  force       = true
   metadata {
     name = data.kubernetes_namespace.this[count.index].metadata[0].name
   }

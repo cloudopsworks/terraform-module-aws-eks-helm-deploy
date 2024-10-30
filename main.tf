@@ -38,7 +38,7 @@ resource "kubernetes_labels" "this" {
   }
   labels = {
     "app.kubernetes.io/name"       = var.release.name
-    "app.kubernetes.io/version"    = local.release_version
+    "app.kubernetes.io/version"    = replace(local.release_version, "+", "-")
     "app.kubernetes.io/managed-by" = "Terraform"
   }
 }

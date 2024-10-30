@@ -83,7 +83,7 @@ resource "kubernetes_labels" "ns_labels" {
   }
   labels = {
     "app.kubernetes.io/name"       = var.release.name
-    "app.kubernetes.io/version"    = local.release_version
+    "app.kubernetes.io/version"    = replace(local.release_version, "+", "_")
     "app.kubernetes.io/managed-by" = "Terraform"
   }
 }

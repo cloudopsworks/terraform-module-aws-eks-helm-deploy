@@ -13,24 +13,36 @@ data "aws_secretsmanager_secrets" "secrets" {
 }
 
 locals {
-  secrets_map = merge([
+  secrets_map_pre = merge([
     for prefix in toset(local.secrets_path_filter) : {
-      for secret_name in data.aws_secretsmanager_secrets.secrets[prefix].names : replace(replace(secret_name, "/", "|"), replace("${prefix}/", "/", "|"), "") => {
-        secret_id = secret_name
-        prefix    = prefix
+      for secret_name in data.aws_secretsmanager_secrets.secrets[prefix].names : secret_name => {
+        secret_arn   = data.aws_secretsmanager_secrets.secrets[prefix].arns[index(data.aws_secretsmanager_secrets.secrets[prefix].names, secret_name)]
+        secret_name  = secret_name
+        prefix       = prefix
+        filtered_key = replace(replace(secret_name, "/", "|"), replace(format("%s", prefix), "/", "|"), "")
+        splitted_key = split("/", secret_name)
       }
     }
   ]...)
 
+  secrets_map = {
+    for key, value in local.secrets_map_pre : key => {
+      secret_arn   = value.secret_arn
+      secret_name  = value.secret_name
+      prefix       = value.prefix
+      filtered_key = value.filtered_key != "" ? value.filtered_key : value.splitted_key[(length(value.splitted_key) - 1)]
+    }
+  }
+
   secrets_plain = {
-    for k, v in local.secrets_map : k => data.aws_secretsmanager_secret_version.secret[k].secret_string
-    if !startswith(data.aws_secretsmanager_secret_version.secret[k].secret_string, "{")
+    for key, value in local.secrets_map : value.filtered_key => data.aws_secretsmanager_secret_version.secret[key].secret_string
+    if !startswith(data.aws_secretsmanager_secret_version.secret[key].secret_string, "{")
   }
 
   secrets_json = merge([
     for key, secret in local.secrets_map : {
       for ent, value in tomap(jsondecode(data.aws_secretsmanager_secret_version.secret[key].secret_string)) :
-      "${key}_${ent}" => value
+      "${secret.filtered_key}_${ent}" => value
     }
     if startswith(data.aws_secretsmanager_secret_version.secret[key].secret_string, "{")
   ]...)
@@ -38,7 +50,7 @@ locals {
 
 data "aws_secretsmanager_secret_version" "secret" {
   for_each  = local.secrets_map
-  secret_id = each.value.secret_id
+  secret_id = each.value.secret_arn
 }
 
 resource "kubernetes_secret" "secrets" {

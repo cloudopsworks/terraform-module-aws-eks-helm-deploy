@@ -16,7 +16,6 @@ locals {
   secrets_map_pre = merge([
     for prefix in toset(local.secrets_path_filter) : {
       for secret_name in data.aws_secretsmanager_secrets.secrets[prefix].names : secret_name => {
-        secret_arn   = data.aws_secretsmanager_secrets.secrets[prefix].arns[index(tolist(data.aws_secretsmanager_secrets.secrets[prefix].names), secret_name)]
         secret_name  = secret_name
         prefix       = prefix
         filtered_key = replace(replace(secret_name, "/", "|"), replace(format("%s", prefix), "/", "|"), "")
@@ -27,7 +26,7 @@ locals {
 
   secrets_map = {
     for key, value in local.secrets_map_pre : key => {
-      secret_arn   = value.secret_arn
+      secret_arn   = data.aws_secretsmanager_secret.secret[value.secret_name].id
       secret_name  = value.secret_name
       prefix       = value.prefix
       filtered_key = replace(value.filtered_key != "" ? value.filtered_key : value.splitted_key[(length(value.splitted_key) - 1)], "-", "_")
@@ -46,6 +45,11 @@ locals {
     }
     if startswith(data.aws_secretsmanager_secret_version.secret[key].secret_string, "{")
   ]...)
+}
+
+data "aws_secretsmanager_secret" "secret" {
+  for_each = local.secrets_map_pre
+  name     = each.value.secret_name
 }
 
 data "aws_secretsmanager_secret_version" "secret" {

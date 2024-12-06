@@ -21,6 +21,19 @@ locals {
       }
     }
   ]...)
+
+  secrets_plain = {
+    for k, v in local.secrets_map : k => data.aws_secretsmanager_secret_version.secret[k].secret_string
+    if !startswith(data.aws_secretsmanager_secret_version.secret[k].secret_string, "{")
+  }
+
+  secrets_json = merge([
+    for key, secret in local.secrets_map : {
+      for ent, value in tomap(jsondecode(data.aws_secretsmanager_secret_version.secret[key].secret_string)) :
+      "${key}_${ent}" => value
+    }
+    if startswith(data.aws_secretsmanager_secret_version.secret[key].secret_string, "{")
+  ]...)
 }
 
 data "aws_secretsmanager_secret_version" "secret" {
@@ -34,7 +47,5 @@ resource "kubernetes_secret" "secrets" {
     name      = "${var.release.name}-injected-secrets"
     namespace = var.namespace
   }
-  data = {
-    for k, v in local.secrets_map : k => data.aws_secretsmanager_secret_version.secret[k].secret_string
-  }
+  data = merge(local.secrets_plain, local.secrets_json)
 }

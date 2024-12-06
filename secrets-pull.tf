@@ -30,7 +30,7 @@ locals {
       secret_arn   = value.secret_arn
       secret_name  = value.secret_name
       prefix       = value.prefix
-      filtered_key = value.filtered_key != "" ? value.filtered_key : value.splitted_key[(length(value.splitted_key) - 1)]
+      filtered_key = replace(value.filtered_key != "" ? value.filtered_key : value.splitted_key[(length(value.splitted_key) - 1)], "-", "_")
     }
   }
 
@@ -42,7 +42,7 @@ locals {
   secrets_json = merge([
     for key, secret in local.secrets_map : {
       for ent, value in tomap(jsondecode(data.aws_secretsmanager_secret_version.secret[key].secret_string)) :
-      "${secret.filtered_key}_${ent}" => value
+      "lower(${secret.filtered_key}_${ent})" => value
     }
     if startswith(data.aws_secretsmanager_secret_version.secret[key].secret_string, "{")
   ]...)

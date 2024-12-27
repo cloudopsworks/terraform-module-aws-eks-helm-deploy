@@ -65,6 +65,12 @@ variable "config_map" {
   default     = {}
 }
 
+variable "secret_files" {
+  description = "Secret files to be injected into a folder alongside with 'secrets' variable templating"
+  type        = any
+  default     = {}
+}
+
 variable "secrets" {
   description = "Secrets to be pulled from AWS Secrets Manager"
   type        = any

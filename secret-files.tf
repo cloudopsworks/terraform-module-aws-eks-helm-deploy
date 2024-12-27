@@ -12,7 +12,7 @@ locals {
   secret_mount_overrides = try(var.secret_files.mount_point, "") != "" && try(var.secret_files.enabled, false) == true ? zipmap(
     [
       "injectedVolumes[${local.secret_index}].name",
-      "injectedVolumes[${local.secret_index}].secret.name",
+      "injectedVolumes[${local.secret_index}].secret.secretName",
       "injectedVolumeMounts[${local.secret_index}].name",
       "injectedVolumeMounts[${local.secret_index}].mountPath",
     ],

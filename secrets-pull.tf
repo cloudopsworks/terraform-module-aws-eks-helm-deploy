@@ -45,6 +45,8 @@ locals {
     }
     if startswith(data.aws_secretsmanager_secret_version.secret[key].secret_string, "{")
   ]...)
+
+  all_secrets_map = merge(local.secrets_plain, local.secrets_json)
 }
 
 data "aws_secretsmanager_secret" "secret" {
@@ -63,5 +65,5 @@ resource "kubernetes_secret" "secrets" {
     name      = "${var.release.name}-injected-secrets"
     namespace = var.namespace
   }
-  data = merge(local.secrets_plain, local.secrets_json)
+  data = local.all_secrets_map
 }

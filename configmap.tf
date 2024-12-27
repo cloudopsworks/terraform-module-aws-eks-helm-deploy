@@ -29,7 +29,7 @@ resource "kubernetes_config_map" "config_map" {
     }
   }
   data = {
-    for file in local.files_in_config_path : file => file("${local.config_path}/${file}")
+    for file in local.files_in_config_path : file => templatefile("${local.config_path}/${file}", local.all_secrets_map)
     if !contains([".empty", ".placeholder"], file)
   }
 }

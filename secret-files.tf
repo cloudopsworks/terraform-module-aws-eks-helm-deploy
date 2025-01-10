@@ -8,8 +8,9 @@ locals {
   secret_files_path           = try(var.secret_files.files_path, "")
   secret_config_path          = local.secret_files_path != "" ? format("%s/%s", local.values_path, local.secret_files_path) : local.values_path
   secret_files_in_config_path = try(var.secret_files.enabled, false) == true ? fileset(local.secret_config_path, "*") : []
-  secret_index                = try(var.config_map.mount_point, "") != "" && try(var.config_map.enabled, false) == true ? 1 : 0
-  secret_mount_overrides = try(var.secret_files.mount_point, "") != "" && try(var.secret_files.enabled, false) == true ? zipmap(
+  secret_index                = local.configmap_enabled ? 1 : 0
+  secret_enabled              = try(var.secret_files.mount_point, "") != "" && try(var.secret_files.enabled, false) == true
+  secret_mount_overrides = local.secret_enabled ? zipmap(
     [
       "injectedVolumes[${local.secret_index}].name",
       "injectedVolumes[${local.secret_index}].secret.secretName",

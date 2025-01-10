@@ -9,7 +9,8 @@ locals {
   files_path           = try(var.config_map.files_path, "")
   config_path          = local.files_path != "" ? format("%s/%s", local.values_path, local.files_path) : local.values_path
   files_in_config_path = try(var.config_map.enabled, false) == true ? fileset(local.config_path, "*") : []
-  mount_overrides = try(var.config_map.mount_point, "") != "" && try(var.config_map.enabled, false) == true ? {
+  configmap_enabled    = try(var.config_map.mount_point, "") != "" && try(var.config_map.enabled, false) == true
+  mount_overrides = local.configmap_enabled ? {
     "injectedVolumes[0].name"           = "${var.release.name}-injected-cm"
     "injectedVolumes[0].configMap.name" = "${var.release.name}-injected-cm"
     "injectedVolumeMounts[0].name"      = "${var.release.name}-injected-cm"

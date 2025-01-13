@@ -89,8 +89,8 @@ variable "namespace_annotations" {
   default     = {}
 }
 
-variable "observability" {
-  description = "Observability configuration"
-  type        = any
-  default     = {}
-}
+# variable "observability" {
+#   description = "Observability configuration"
+#   type        = any
+#   default     = {}
+# }

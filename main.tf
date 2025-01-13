@@ -9,7 +9,7 @@ locals {
   secrets_overrides = length(local.secrets_path_filter) > 0 ? {
     "injectEnvFrom[0].secretRef.name" = kubernetes_secret.secrets[0].metadata[0].name
   } : {}
-  all_overrides   = merge(var.values_overrides, local.secrets_overrides, local.mount_overrides, local.secret_mount_overrides) #, local.observability_overrides)
+  all_overrides   = merge(var.values_overrides, local.secrets_overrides, local.mount_overrides, local.secret_mount_overrides)
   source_version  = try(var.release.source.version, "")
   app_version     = try(var.release.version, "")
   release_version = coalesce(local.source_version, local.app_version, "NA")

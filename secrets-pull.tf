@@ -29,7 +29,7 @@ locals {
       secret_arn   = data.aws_secretsmanager_secret.secret[value.secret_name].id
       secret_name  = value.secret_name
       prefix       = value.prefix
-      filtered_key = replace(value.filtered_key != "" ? replace(value.filtered_key, "/^[-_]+/", "") : value.splitted_key[(length(value.splitted_key) - 1)], "-", "_")
+      filtered_key = replace(replace((value.filtered_key != "" ? value.filtered_key : value.splitted_key[(length(value.splitted_key) - 1)]), "-", "_"), "/^[-_|]+/", "")
     }
   }
 

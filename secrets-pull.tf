@@ -26,7 +26,6 @@ locals {
 
   secrets_map = {
     for key, value in local.secrets_map_pre : key => {
-      secret_arn   = data.aws_secretsmanager_secret.secret[value.secret_name].id
       secret_name  = value.secret_name
       prefix       = value.prefix
       filtered_key = replace(replace((value.filtered_key != "" ? value.filtered_key : value.splitted_key[(length(value.splitted_key) - 1)]), "-", "_"), "/^[-_|]+/", "")
@@ -49,14 +48,9 @@ locals {
   all_secrets_map = merge(local.secrets_plain, local.secrets_json)
 }
 
-data "aws_secretsmanager_secret" "secret" {
-  for_each = local.secrets_map_pre
-  name     = each.value.secret_name
-}
-
 data "aws_secretsmanager_secret_version" "secret" {
   for_each  = local.secrets_map
-  secret_id = each.value.secret_arn
+  secret_id = each.value.secret_name
 }
 
 resource "kubernetes_secret" "secrets" {

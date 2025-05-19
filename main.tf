@@ -62,33 +62,6 @@ data "kubernetes_namespace" "this" {
   }
 }
 
-resource "kubernetes_annotations" "ns_annotations" {
-  count       = var.create_namespace ? 0 : 1
-  api_version = "v1"
-  kind        = "Namespace"
-  force       = true
-  metadata {
-    name = data.kubernetes_namespace.this[count.index].metadata[0].name
-  }
-  annotations = var.namespace_annotations
-}
-
-# resource "kubernetes_labels" "ns_labels" {
-#   count       = var.create_namespace ? 0 : 1
-#   api_version = "v1"
-#   kind        = "Namespace"
-#   force       = true
-#   metadata {
-#     name = data.kubernetes_namespace.this[count.index].metadata[0].name
-#   }
-#   labels = {
-#     "app.kubernetes.io/name"       = var.release.name
-#     "app.kubernetes.io/version"    = replace(local.release_version, "+", "_")
-#     "app.kubernetes.io/managed-by" = "Terraform"
-#   }
-# }
-
-
 resource "helm_release" "repo" {
   count            = var.helm_repo_url != "" ? 1 : 0
   name             = var.release.name

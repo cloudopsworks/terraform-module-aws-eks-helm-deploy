@@ -76,15 +76,13 @@ resource "helm_release" "repo" {
     file("${var.absolute_path}/${var.values_file}")
   ]
 
-  dynamic "set" {
-    for_each = local.all_overrides
-
-    content {
-      name  = set.key
-      value = replace(set.value, ",", "\\,")
+  set = [
+    for key, value in local.all_overrides : {
+      name  = key
+      value = replace(value, ",", "\\,")
       type  = "string"
     }
-  }
+  ]
 
   #   dynamic "set_sensitive" {
   #     for_each = var.sensitive_vars
@@ -109,15 +107,13 @@ resource "helm_release" "default" {
     file(var.values_file)
   ]
 
-  dynamic "set" {
-    for_each = local.all_overrides
-
-    content {
-      name  = set.key
-      value = replace(set.value, ",", "\\,")
+  set = [
+    for key, value in local.all_overrides : {
+      name  = key
+      value = replace(value, ",", "\\,")
       type  = "string"
     }
-  }
+  ]
 
   # dynamic "set" {
   #   for_each = local.observability_envs

@@ -37,7 +37,7 @@ locals {
 resource "kubernetes_manifest" "external_secret_store" {
   count = local.external_secrets_enabled && local.external_secrets_create_store && length(local.secrets_path_filter) > 0 ? 1 : 0
   manifest = {
-    apiVersion = "external-secrets.io/v1beta1"
+    apiVersion = "external-secrets.io/v1"
     kind       = "SecretStore"
     metadata = {
       name      = "${var.release.name}-external-secret-store"

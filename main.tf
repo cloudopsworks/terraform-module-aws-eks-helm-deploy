@@ -8,9 +8,11 @@
 #
 
 locals {
-  secrets_path_filter = try(var.secrets.secrets_path_filter, [])
-  secrets_overrides = length(local.secrets_path_filter) > 0 ? (var.external_secrets.enabled ? {
-    "injectEnvFrom[0].secretRef.name" = kubernetes_manifest.external_secret[0].object.metadata[0].name
+  secrets_path_filter           = try(var.secrets.secrets_path_filter, [])
+  external_secrets_enabled      = try(var.secrets.external_secrets.enabled, false)
+  external_secrets_create_store = try(var.secrets.external_secrets.create_store, false)
+  secrets_overrides = length(local.secrets_path_filter) > 0 ? (local.external_secrets_enabled ? {
+    "injectEnvFrom[0].secretRef.name" = kubernetes_manifest.external_secret[0].object.metadata.name
     } : {
     "injectEnvFrom[0].secretRef.name" = kubernetes_secret.secrets[0].metadata[0].name
     }

@@ -102,9 +102,3 @@ variable "external_secrets" {
   })
   default = {}
 }
-
-variable "external_secrets_store_name" {
-  description = "(optional) Name of the External Secrets Store, required if external_secrets_enabled is true, and extenal_secrets_create_store is false"
-  type        = string
-  default     = ""
-}

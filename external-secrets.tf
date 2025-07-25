@@ -73,7 +73,7 @@ resource "kubernetes_manifest" "external_secret" {
       target = {
         name            = "${var.release.name}-external-secret"
         creationPolicy  = "Owner"
-        deleteionPolicy = "Retain"
+        deletionPolicy = "Retain"
       }
       data = local.external_secrets_data
     }

@@ -82,6 +82,7 @@ variable "secret_files" {
 #     create_store: true | false            # Optional: set this if you want to create the External Secrets Store
 #     store_name: "external-secrets-store"  # Optional: set this if you want to use an existing External Secrets Store, valid only if create_store is false
 #     refresh_interval: "1h"                # Optional: set this to change the refresh interval of the External Secrets Store
+#     on_change: true | false               # Optional: set this to true if you want to trigger the deployment on change of the secrets
 variable "secrets" {
   description = "Secrets to be pulled from AWS Secrets Manager"
   type        = any

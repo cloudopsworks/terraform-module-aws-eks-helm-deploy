@@ -60,6 +60,7 @@ resource "kubernetes_manifest" "external_secret" {
       namespace = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
     }
     spec = {
+      refreshPolicy   = try(var.secrets.external_secrets.on_change, false) ? "OnChange" : "Periodic"
       refreshInterval = try(var.secrets.external_secrets.refresh_interval, "1h")
       secretStoreRef = {
         kind = "SecretStore"

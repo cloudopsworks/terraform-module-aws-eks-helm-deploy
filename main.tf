@@ -1,14 +1,22 @@
 ##
-# (c) 2024 - Cloud Ops Works LLC - https://cloudops.works/
-#            On GitHub: https://github.com/cloudopsworks
-#            Distributed Under Apache v2.0 License
+# (c) 2021-2025
+#     Cloud Ops Works LLC - https://cloudops.works/
+#     Find us on:
+#       GitHub: https://github.com/cloudopsworks
+#       WebSite: https://cloudops.works
+#     Distributed Under Apache v2.0 License
 #
 
 locals {
-  secrets_path_filter = try(var.secrets.secrets_path_filter, [])
-  secrets_overrides = length(local.secrets_path_filter) > 0 ? {
+  secrets_path_filter           = try(var.secrets.secrets_path_filter, [])
+  external_secrets_enabled      = try(var.secrets.external_secrets.enabled, false)
+  external_secrets_create_store = try(var.secrets.external_secrets.create_store, false)
+  secrets_overrides = length(local.secrets_path_filter) > 0 ? (local.external_secrets_enabled ? {
+    "injectEnvFrom[0].secretRef.name" = kubernetes_manifest.external_secret[0].object.metadata.name
+    } : {
     "injectEnvFrom[0].secretRef.name" = kubernetes_secret.secrets[0].metadata[0].name
-  } : {}
+    }
+  ) : {}
   all_overrides   = merge(var.values_overrides, local.secrets_overrides, local.mount_overrides, local.secret_mount_overrides)
   source_version  = try(var.release.source.version, "")
   app_version     = try(var.release.version, "")

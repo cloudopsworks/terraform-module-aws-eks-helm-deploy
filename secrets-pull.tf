@@ -1,7 +1,10 @@
 ##
-# (c) 2024 - Cloud Ops Works LLC - https://cloudops.works/
-#            On GitHub: https://github.com/cloudopsworks
-#            Distributed Under Apache v2.0 License
+# (c) 2021-2025
+#     Cloud Ops Works LLC - https://cloudops.works/
+#     Find us on:
+#       GitHub: https://github.com/cloudopsworks
+#       WebSite: https://cloudops.works
+#     Distributed Under Apache v2.0 License
 #
 
 data "aws_secretsmanager_secrets" "secrets" {
@@ -54,10 +57,10 @@ data "aws_secretsmanager_secret_version" "secret" {
 }
 
 resource "kubernetes_secret" "secrets" {
-  count = length(local.secrets_path_filter) > 0 ? 1 : 0
+  count = length(local.secrets_path_filter) > 0 && !local.external_secrets_enabled ? 1 : 0
   metadata {
     name      = "${var.release.name}-injected-secrets"
-    namespace = var.namespace
+    namespace = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
   }
   data = local.all_secrets_map
 }

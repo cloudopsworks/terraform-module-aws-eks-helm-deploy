@@ -31,7 +31,7 @@ locals {
 }
 
 resource "kubernetes_manifest" "external_secret_store" {
-  count = var.external_secrets.enabled && var.external_secrets.create_store && length(local.secrets_path_filter) > 0 ? 1 : 0
+  count = local.external_secrets_enabled && local.external_secrets_create_store && length(local.secrets_path_filter) > 0 ? 1 : 0
   manifest = {
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "SecretStore"
@@ -51,7 +51,7 @@ resource "kubernetes_manifest" "external_secret_store" {
 }
 
 resource "kubernetes_manifest" "external_secret" {
-  count = var.external_secrets.enabled && length(local.secrets_path_filter) > 0 ? 1 : 0
+  count = local.external_secrets_enabled && length(local.secrets_path_filter) > 0 ? 1 : 0
   manifest = {
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ExternalSecret"
@@ -60,10 +60,10 @@ resource "kubernetes_manifest" "external_secret" {
       namespace = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
     }
     spec = {
-      refreshInterval = var.external_secrets.refresh_interval
+      refreshInterval = try(var.secrets.external_secrets.refresh_interval, "1h")
       secretStoreRef = {
         kind = "SecretStore"
-        name = var.external_secrets.create_store ? kubernetes_manifest.external_secret_store[0].object.metadata[0].name : var.external_secrets.store_name
+        name = local.external_secrets_create_store ? kubernetes_manifest.external_secret_store[0].object.metadata[0].name : var.secrets.external_secrets.store_name
       }
       target = {
         name            = "${var.release.name}-external-secret"

@@ -74,6 +74,14 @@ variable "secret_files" {
   default     = {}
 }
 
+# Documentation for the secrets variable - YAML
+# secrets:
+#   secrets_path_filter: [] List of secrets to be pulled from AWS Secrets Manager
+#   external_secrets:                 # If Enabled, secrets path filter will be used to configure the External Secrets Store for automatically fetching secrets from AWS Secrets Manager
+#     enabled: true | false                 # Optional: set this to true if you want to use the External Secrets Store, defaults to false
+#     create_store: true | false            # Optional: set this if you want to create the External Secrets Store
+#     store_name: "external-secrets-store"  # Optional: set this if you want to use an existing External Secrets Store, valid only if create_store is false
+#     refresh_interval: "1h"                # Optional: set this to change the refresh interval of the External Secrets Store
 variable "secrets" {
   description = "Secrets to be pulled from AWS Secrets Manager"
   type        = any
@@ -90,16 +98,4 @@ variable "namespace_annotations" {
   description = "Annotations for the namespace"
   type        = any
   default     = {}
-}
-
-variable "external_secrets" {
-  description = "(optional) External Secrets configuration object, required if external_secrets_enabled is true"
-  type = object({
-    enabled          = optional(bool, false)
-    create_store     = optional(bool, false)
-    store_name       = optional(string, "")
-    refresh_interval = optional(string, "1h")
-  })
-  default = {}
-  nullable = false
 }

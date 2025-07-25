@@ -9,9 +9,12 @@
 
 locals {
   secrets_path_filter = try(var.secrets.secrets_path_filter, [])
-  secrets_overrides = length(local.secrets_path_filter) > 0 ? {
+  secrets_overrides = length(local.secrets_path_filter) > 0 ? (var.external_secrets.enabled ? {
+    "injectEnvFrom[0].secretRef.name" = kubernetes_manifest.external_secret[0].object.metadata[0].name
+    } : {
     "injectEnvFrom[0].secretRef.name" = kubernetes_secret.secrets[0].metadata[0].name
-  } : {}
+    }
+  ) : {}
   all_overrides   = merge(var.values_overrides, local.secrets_overrides, local.mount_overrides, local.secret_mount_overrides)
   source_version  = try(var.release.source.version, "")
   app_version     = try(var.release.version, "")

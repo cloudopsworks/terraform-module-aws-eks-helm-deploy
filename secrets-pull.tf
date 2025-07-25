@@ -57,10 +57,10 @@ data "aws_secretsmanager_secret_version" "secret" {
 }
 
 resource "kubernetes_secret" "secrets" {
-  count = length(local.secrets_path_filter) > 0 ? 1 : 0
+  count = length(local.secrets_path_filter) > 0 && !var.external_secrets.enabled ? 1 : 0
   metadata {
     name      = "${var.release.name}-injected-secrets"
-    namespace = var.namespace
+    namespace = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
   }
   data = local.all_secrets_map
 }

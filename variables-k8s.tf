@@ -1,7 +1,10 @@
 ##
-# (c) 2024 - Cloud Ops Works LLC - https://cloudops.works/
-#            On GitHub: https://github.com/cloudopsworks
-#            Distributed Under Apache v2.0 License
+# (c) 2021-2025
+#     Cloud Ops Works LLC - https://cloudops.works/
+#     Find us on:
+#       GitHub: https://github.com/cloudopsworks
+#       WebSite: https://cloudops.works
+#     Distributed Under Apache v2.0 License
 #
 
 variable "namespace" {
@@ -87,4 +90,21 @@ variable "namespace_annotations" {
   description = "Annotations for the namespace"
   type        = any
   default     = {}
+}
+
+variable "external_secrets" {
+  description = "(optional) External Secrets configuration object, required if external_secrets_enabled is true"
+  type = object({
+    enabled          = optional(bool, false)
+    create_store     = optional(bool, false)
+    store_name       = optional(string, "")
+    refresh_interval = optional(string, "1h")
+  })
+  default = {}
+}
+
+variable "external_secrets_store_name" {
+  description = "(optional) Name of the External Secrets Store, required if external_secrets_enabled is true, and extenal_secrets_create_store is false"
+  type        = string
+  default     = ""
 }

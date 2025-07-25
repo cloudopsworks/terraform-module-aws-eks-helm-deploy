@@ -101,4 +101,5 @@ variable "external_secrets" {
     refresh_interval = optional(string, "1h")
   })
   default = {}
+  nullable = false
 }

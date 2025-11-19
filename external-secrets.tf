@@ -71,8 +71,8 @@ resource "kubernetes_manifest" "external_secret" {
         name = local.external_secrets_create_store ? kubernetes_manifest.external_secret_store[0].object.metadata.name : var.secrets.external_secrets.store_name
       }
       target = {
-        name            = "${var.release.name}-external-secret"
-        creationPolicy  = "Owner"
+        name           = "${var.release.name}-external-secret"
+        creationPolicy = "Owner"
         deletionPolicy = "Retain"
       }
       data = local.external_secrets_data

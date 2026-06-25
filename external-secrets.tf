@@ -1,5 +1,5 @@
 ##
-# (c) 2021-2025
+# (c) 2021-2026
 #     Cloud Ops Works LLC - https://cloudops.works/
 #     Find us on:
 #       GitHub: https://github.com/cloudopsworks
@@ -46,7 +46,7 @@ resource "kubernetes_manifest" "external_secret_store" {
     spec = {
       provider = {
         aws = {
-          region  = data.aws_region.current.id
+          region  = data.aws_region.current.region
           service = "SecretsManager"
         }
       }

@@ -1,5 +1,5 @@
 ##
-# (c) 2021-2025
+# (c) 2021-2026
 #     Cloud Ops Works LLC - https://cloudops.works/
 #     Find us on:
 #       GitHub: https://github.com/cloudopsworks
@@ -7,15 +7,16 @@
 #     Distributed Under Apache v2.0 License
 #
 
-# Establish this is a HUB or spoke configuration
+# is_hub: false # (Optional) Indicates whether this deployment belongs to a hub configuration. Default: false.
 variable "is_hub" {
-  description = "Is this a hub or spoke configuration?"
+  description = "Indicates whether this deployment belongs to a hub configuration."
   type        = bool
   default     = false
 }
 
+# spoke_def: "001" # (Optional) Three-digit spoke identifier used in generated names. Default: "001".
 variable "spoke_def" {
-  description = "Spoke ID Number, must be a 3 digit number"
+  description = "Three-digit spoke identifier used in generated names."
   type        = string
   default     = "001"
   validation {
@@ -24,8 +25,13 @@ variable "spoke_def" {
   }
 }
 
+# org: # (Required) Organization context used by naming and tagging.
+#   organization_name: "Example Organization" # (Required) Full organization name.
+#   organization_unit: "platform"             # (Required) Organization unit or team name used in resource names.
+#   environment_type: "prod"                  # (Required) Environment type such as dev, stage, prod, or shared.
+#   environment_name: "primary"               # (Required) Environment name used in resource names and tags.
 variable "org" {
-  description = "Organization details"
+  description = "Organization context used by naming and tagging."
   type = object({
     organization_name = string
     organization_unit = string
@@ -34,8 +40,10 @@ variable "org" {
   })
 }
 
+# extra_tags: {} # (Optional) Additional tags merged with generated Cloud Ops Works common tags. Default: {}.
+#   CostCenter: "platform"
 variable "extra_tags" {
-  description = "Extra tags to add to the resources"
+  description = "Additional tags merged with generated Cloud Ops Works common tags."
   type        = map(string)
   default     = {}
 }

@@ -10,10 +10,12 @@
 
 [![cloudopsworks][logo]](https://cloudopsworks.co/)
 
-# Terraform Transit Gateway Module
+# Terraform AWS EKS Helm Deploy Module
+
+ [![Latest Release](https://img.shields.io/github/release/cloudopsworks/terraform-module-aws-eks-helm-deploy.svg?style=for-the-badge)](https://github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy/releases/latest) [![Last Updated](https://img.shields.io/github/last-commit/cloudopsworks/terraform-module-aws-eks-helm-deploy.svg?style=for-the-badge)](https://github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy/commits)
 
 
-VPC Module for setting up transit gateway with ResourceAccessMananger support.
+Terraform module for deploying Helm releases into AWS EKS clusters with optional namespace creation, ConfigMap and Secret file injection, AWS Secrets Manager integration, and External Secrets Operator manifests.
 
 
 ---
@@ -41,10 +43,235 @@ We have [*lots of terraform modules*][terraform_modules] that are Open Source an
 
 
 
+## Introduction
+
+This module standardizes application deployment into Amazon EKS through the Helm provider. It supports both repository-backed charts and local charts, applies common Cloud Ops Works tags, can create or reuse target namespaces, and can inject configuration or secret material into charts through generated Helm value overrides.
+
+The module can pull AWS Secrets Manager values directly into Kubernetes Secrets or render External Secrets Operator resources when the cluster already runs the operator. Terragrunt scaffolding is included to wire the module to an upstream EKS dependency and to generate Kubernetes and Helm providers from the EKS cluster outputs.
+
+## Usage
 
 
+**IMPORTANT:** The `master` branch is used in `source` just as an example. In your code, do not pin to `master` because there may be breaking changes between releases.
+Instead pin to the release tag (e.g. `?ref=vX.Y.Z`) of one of our [latest releases](https://github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy/releases).
 
 
+## Terragrunt scaffolding workflow
+
+Create the target deployment directory first, then run `terragrunt scaffold` from that directory. Do not use `--working-dir`; scaffold writes into the current directory.
+
+```sh
+# 1. Create and enter the target deployment directory
+mkdir -p live/prod/us-east-1/app/helm-deploy
+cd live/prod/us-east-1/app/helm-deploy
+
+# 2. Scaffold the module
+terragrunt scaffold github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy
+
+# 3. Edit inputs.yaml with deployment-specific values
+vi inputs.yaml
+
+# 4. Apply
+terragrunt apply
+```
+
+During scaffolding, provide the EKS dependency path when prompted. The default is `../eks`; the dependency must expose at least `cluster_name` for provider generation.
+
+## Generated `inputs.yaml`
+
+The scaffold copies `.boilerplate/inputs.yaml` so operators can configure the deployment without reading Terraform source:
+
+```yaml
+# Module configuration
+namespace: "apps" # (Required) Kubernetes namespace where the Helm release and optional Kubernetes resources are managed.
+
+release: # (Required) Helm release metadata used by resources and labels. Default: {}.
+  name: "my-app" # (Required) Helm release name.
+  version: "1.0.0" # (Optional) Application/chart version used for local chart labels and remote chart version when release.source.version is unset. Default: "".
+  source: # (Optional) Source metadata for remote chart deployments. Default: {}.
+    version: "1.0.0" # (Optional) Helm chart version for repository-backed releases; takes precedence over release.version. Default: "".
+
+helm_repo_url: "" # (Optional) Helm repository URL. Leave empty to deploy a local chart from helm_chart_path or absolute_path/helm/charts. OCI repositories are supported. Default: "".
+helm_chart_name: "" # (Optional) Chart name to install when helm_repo_url is set. Default: "".
+helm_chart_path: "" # (Optional) Local chart path used when helm_repo_url is empty; defaults to absolute_path/helm/charts when empty. Default: "".
+values_file: "values.yaml" # (Required) Values file path. Repository-backed charts are read from absolute_path/values_file; local charts use the path as provided.
+
+values_overrides: {} # (Optional) Helm set overrides merged with secret/config mount overrides. Values are sent as string set entries. Default: {}.
+#  image.tag: "1.0.0" # (Optional) Example Helm value override key and value.
+
+absolute_path: "." # (Optional) Base path for values and injected file folders. Default: ".".
+
+config_map: # (Optional) ConfigMap file injection settings. Default: {}.
+  enabled: false # (Optional) Create a ConfigMap from files under absolute_path/values/files_path. Default: false.
+  files_path: "config" # (Optional) Folder below absolute_path/values containing ConfigMap files. Default: "".
+  mount_point: "/config" # (Optional) Pod mount path injected through Helm overrides. Default: "".
+
+secret_files: # (Optional) Secret file injection settings. Files are rendered as templates with pulled Secrets Manager values. Default: {}.
+  enabled: false # (Optional) Create a Kubernetes Secret from files under absolute_path/values/files_path. Default: false.
+  files_path: "secrets" # (Optional) Folder below absolute_path/values containing secret templates. Default: "".
+  mount_point: "/secrets" # (Optional) Pod mount path injected through Helm overrides. Default: "".
+
+secrets: # (Optional) AWS Secrets Manager pull and External Secrets Operator settings. Default: {}.
+  secrets_path_filter: [] # (Optional) List of AWS Secrets Manager name filters/prefixes to read. Default: [].
+  external_secrets: # (Optional) External Secrets Operator configuration. Default: {}.
+    enabled: false # (Optional) Create an ExternalSecret instead of a native Kubernetes Secret. Default: false.
+    create_store: false # (Optional) Create a SecretStore in the target namespace. Default: false.
+    store_name: "external-secrets-store" # (Optional) Existing SecretStore name when create_store is false. Default: "".
+    refresh_interval: "1h" # (Optional) ExternalSecret refresh interval for Periodic refreshPolicy. Default: "1h".
+    on_change: false # (Optional) Use OnChange refreshPolicy instead of Periodic. Default: false.
+
+create_namespace: false # (Optional) Create the Kubernetes namespace when true; otherwise the namespace must already exist. Default: false.
+namespace_annotations: {} # (Optional) Annotations applied to the namespace when create_namespace is true. Default: {}.
+#  example.com/owner: "platform"
+timeout: 300 # (Optional) Timeout in seconds for Helm release operations. Default: 300.
+```
+
+## Generated `terragrunt.hcl`
+
+The rendered Terragrunt file loads `inputs.yaml` as `local.local_vars`, reads hierarchy metadata, wires the upstream EKS dependency into generated providers, and maps module variables into Terraform inputs:
+
+```hcl
+locals {
+  local_vars  = yamldecode(file("./inputs.yaml"))
+  spoke_vars  = yamldecode(file(find_in_parent_folders("spoke-inputs.yaml")))
+  region_vars = yamldecode(file(find_in_parent_folders("region-inputs.yaml")))
+  env_vars    = yamldecode(file(find_in_parent_folders("env-inputs.yaml")))
+  global_vars = yamldecode(file(find_in_parent_folders("global-inputs.yaml")))
+
+  local_tags  = jsondecode(file("./local-tags.json"))
+  spoke_tags  = jsondecode(file(find_in_parent_folders("spoke-tags.json")))
+  region_tags = jsondecode(file(find_in_parent_folders("region-tags.json")))
+  env_tags    = jsondecode(file(find_in_parent_folders("env-tags.json")))
+  global_tags = jsondecode(file(find_in_parent_folders("global-tags.json")))
+
+  tags = merge(
+    local.global_tags,
+    local.env_tags,
+    local.region_tags,
+    local.spoke_tags,
+    local.local_tags
+  )
+}
+
+include "root" {
+  path = find_in_parent_folders("root.hcl")
+}
+
+dependency "eks" {
+  config_path = "../eks"
+  mock_outputs_allowed_terraform_commands = ["validate", "destroy"]
+  mock_outputs = {
+    cluster_name = "eks-cluster"
+    lb_irsa_role = {
+      arn  = "arn:aws:iam::123456789012:role/eks-lb-irsa-role"
+      name = "eks-lb-irsa-role"
+    }
+  }
+}
+
+generate "kubernetes_provider" {
+  path      = "provider.l.tf"
+  if_exists = "overwrite_terragrunt"
+  contents  = <<EOF
+data "aws_eks_cluster" "cluster" {
+  name = "${dependency.eks.outputs.cluster_name}"
+}
+
+data "aws_eks_cluster_auth" "cluster" {
+  name = "${dependency.eks.outputs.cluster_name}"
+}
+
+provider "kubernetes" {
+  host                   = data.aws_eks_cluster.cluster.endpoint
+  cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority.0.data)
+  token                  = data.aws_eks_cluster_auth.cluster.token
+}
+
+provider "helm" {
+  kubernetes = {
+    host                   = data.aws_eks_cluster.cluster.endpoint
+    cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority.0.data)
+    token                  = data.aws_eks_cluster_auth.cluster.token
+  }
+}
+EOF
+}
+
+terraform {
+  source = "github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy"
+}
+
+inputs = {
+  is_hub                = false
+  org                   = local.env_vars.org
+  spoke_def             = local.spoke_vars.spoke_def
+  namespace             = local.local_vars.namespace
+  values_file           = local.local_vars.values_file
+  release               = try(local.local_vars.release, {})
+  helm_repo_url         = try(local.local_vars.helm_repo_url, "")
+  helm_chart_name       = try(local.local_vars.helm_chart_name, "")
+  helm_chart_path       = try(local.local_vars.helm_chart_path, "")
+  values_overrides      = try(local.local_vars.values_overrides, {})
+  absolute_path         = try(local.local_vars.absolute_path, ".")
+  config_map            = try(local.local_vars.config_map, {})
+  secret_files          = try(local.local_vars.secret_files, {})
+  secrets               = try(local.local_vars.secrets, {})
+  create_namespace      = try(local.local_vars.create_namespace, false)
+  namespace_annotations = try(local.local_vars.namespace_annotations, {})
+  timeout               = try(local.local_vars.timeout, 300)
+  extra_tags            = local.tags
+}
+```
+
+## Quick Start
+
+1. Ensure an EKS Terragrunt module exists in the same live hierarchy and exposes `cluster_name`.
+2. Scaffold this module into the target application directory with `terragrunt scaffold github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy`.
+3. Edit `inputs.yaml`: set `namespace`, `release.name`, `values_file`, and either repository chart fields (`helm_repo_url` plus `helm_chart_name`) or `helm_chart_path` for a local chart.
+4. Add optional `config_map`, `secret_files`, `secrets`, and `timeout` settings as needed.
+5. Run `terragrunt validate`, then `terragrunt apply`.
+
+
+## Examples
+
+## Repository-backed chart
+
+```yaml
+namespace: "ingress-nginx"
+release:
+  name: "ingress-nginx"
+  source:
+    version: "4.11.3"
+helm_repo_url: "https://kubernetes.github.io/ingress-nginx"
+helm_chart_name: "ingress-nginx"
+values_file: "values.yaml"
+create_namespace: true
+timeout: 600
+```
+
+## Local chart with injected config and AWS secrets
+
+```yaml
+namespace: "apps"
+release:
+  name: "orders-api"
+  version: "1.4.0"
+helm_chart_path: "./helm/charts/orders-api"
+values_file: "./values.yaml"
+config_map:
+  enabled: true
+  files_path: "config"
+  mount_point: "/app/config"
+secret_files:
+  enabled: true
+  files_path: "secret-templates"
+  mount_point: "/app/secrets"
+secrets:
+  secrets_path_filter:
+    - "/platform/prod/orders-api"
+values_overrides:
+  image.tag: "1.4.0"
+```
 
 
 
@@ -65,7 +292,7 @@ Available targets:
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.4 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.35 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 3.0 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.38 |
 
@@ -73,9 +300,9 @@ Available targets:
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.4 |
-| <a name="provider_helm"></a> [helm](#provider\_helm) | ~> 3.0 |
-| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | ~> 2.38 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.52.0 |
+| <a name="provider_helm"></a> [helm](#provider\_helm) | 3.2.0 |
+| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | 2.38.0 |
 
 ## Modules
 
@@ -106,23 +333,24 @@ Available targets:
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_absolute_path"></a> [absolute\_path](#input\_absolute\_path) | Absolute path of the current directory | `string` | `"."` | no |
-| <a name="input_config_map"></a> [config\_map](#input\_config\_map) | ConfigMap to be created | `any` | `{}` | no |
-| <a name="input_create_namespace"></a> [create\_namespace](#input\_create\_namespace) | Create the namespace if it does not exist | `bool` | `false` | no |
-| <a name="input_extra_tags"></a> [extra\_tags](#input\_extra\_tags) | Extra tags to add to the resources | `map(string)` | `{}` | no |
-| <a name="input_helm_chart_name"></a> [helm\_chart\_name](#input\_helm\_chart\_name) | Name of the Helm chart | `string` | `""` | no |
-| <a name="input_helm_chart_path"></a> [helm\_chart\_path](#input\_helm\_chart\_path) | Path to the Helm chart | `string` | `""` | no |
-| <a name="input_helm_repo_url"></a> [helm\_repo\_url](#input\_helm\_repo\_url) | URL of the Helm repository | `string` | `""` | no |
-| <a name="input_is_hub"></a> [is\_hub](#input\_is\_hub) | Is this a hub or spoke configuration? | `bool` | `false` | no |
-| <a name="input_namespace"></a> [namespace](#input\_namespace) | Namespace for the resources | `string` | n/a | yes |
-| <a name="input_namespace_annotations"></a> [namespace\_annotations](#input\_namespace\_annotations) | Annotations for the namespace | `any` | `{}` | no |
-| <a name="input_org"></a> [org](#input\_org) | Organization details | <pre>object({<br/>    organization_name = string<br/>    organization_unit = string<br/>    environment_type  = string<br/>    environment_name  = string<br/>  })</pre> | n/a | yes |
-| <a name="input_release"></a> [release](#input\_release) | Release configuration | `any` | `{}` | no |
-| <a name="input_secret_files"></a> [secret\_files](#input\_secret\_files) | Secret files to be injected into a folder alongside with 'secrets' variable templating | `any` | `{}` | no |
-| <a name="input_secrets"></a> [secrets](#input\_secrets) | Secrets to be pulled from AWS Secrets Manager | `any` | `{}` | no |
-| <a name="input_spoke_def"></a> [spoke\_def](#input\_spoke\_def) | Spoke ID Number, must be a 3 digit number | `string` | `"001"` | no |
-| <a name="input_values_file"></a> [values\_file](#input\_values\_file) | Path to the values file | `string` | n/a | yes |
-| <a name="input_values_overrides"></a> [values\_overrides](#input\_values\_overrides) | Values to be passed to the Helm chart | `any` | `{}` | no |
+| <a name="input_absolute_path"></a> [absolute\_path](#input\_absolute\_path) | Base path for values and injected file folders. | `string` | `"."` | no |
+| <a name="input_config_map"></a> [config\_map](#input\_config\_map) | ConfigMap file injection settings. | `any` | `{}` | no |
+| <a name="input_create_namespace"></a> [create\_namespace](#input\_create\_namespace) | Create the Kubernetes namespace when true; otherwise the namespace must already exist. | `bool` | `false` | no |
+| <a name="input_extra_tags"></a> [extra\_tags](#input\_extra\_tags) | Additional tags merged with generated Cloud Ops Works common tags. | `map(string)` | `{}` | no |
+| <a name="input_helm_chart_name"></a> [helm\_chart\_name](#input\_helm\_chart\_name) | Chart name to install when helm\_repo\_url is set. | `string` | `""` | no |
+| <a name="input_helm_chart_path"></a> [helm\_chart\_path](#input\_helm\_chart\_path) | Local chart path used when helm\_repo\_url is empty; defaults to absolute\_path/helm/charts when empty. | `string` | `""` | no |
+| <a name="input_helm_repo_url"></a> [helm\_repo\_url](#input\_helm\_repo\_url) | Helm repository URL. Leave empty to deploy a local chart from helm\_chart\_path or absolute\_path/helm/charts. | `string` | `""` | no |
+| <a name="input_is_hub"></a> [is\_hub](#input\_is\_hub) | Indicates whether this deployment belongs to a hub configuration. | `bool` | `false` | no |
+| <a name="input_namespace"></a> [namespace](#input\_namespace) | Kubernetes namespace where the Helm release and optional Kubernetes resources are managed. | `string` | n/a | yes |
+| <a name="input_namespace_annotations"></a> [namespace\_annotations](#input\_namespace\_annotations) | Annotations applied to the namespace when create\_namespace is true. | `any` | `{}` | no |
+| <a name="input_org"></a> [org](#input\_org) | Organization context used by naming and tagging. | <pre>object({<br/>    organization_name = string<br/>    organization_unit = string<br/>    environment_type  = string<br/>    environment_name  = string<br/>  })</pre> | n/a | yes |
+| <a name="input_release"></a> [release](#input\_release) | Helm release metadata used by resources and labels. | `any` | `{}` | no |
+| <a name="input_secret_files"></a> [secret\_files](#input\_secret\_files) | Secret file injection settings. Files are rendered as templates with pulled Secrets Manager values. | `any` | `{}` | no |
+| <a name="input_secrets"></a> [secrets](#input\_secrets) | AWS Secrets Manager pull and External Secrets Operator settings. | `any` | `{}` | no |
+| <a name="input_spoke_def"></a> [spoke\_def](#input\_spoke\_def) | Three-digit spoke identifier used in generated names. | `string` | `"001"` | no |
+| <a name="input_timeout"></a> [timeout](#input\_timeout) | Timeout in seconds for Helm release operations. | `number` | `300` | no |
+| <a name="input_values_file"></a> [values\_file](#input\_values\_file) | Values file path. Repository-backed charts are read from absolute\_path/values\_file; local charts use the path as provided. | `string` | n/a | yes |
+| <a name="input_values_overrides"></a> [values\_overrides](#input\_values\_overrides) | Helm set overrides merged with secret/config mount overrides. Values are sent as string set entries. | `any` | `{}` | no |
 
 ## Outputs
 
@@ -134,7 +362,7 @@ No outputs.
 
 **Got a question?** We got answers. 
 
-File a GitHub [issue](https://github.com/cloudopsworks/terraform-module-aws-vpc-setup/issues), send us an [email][email] or join our [Slack Community][slack].
+File a GitHub [issue](https://github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy/issues), send us an [email][email] or join our [Slack Community][slack].
 
 
 ## DevOps Tools
@@ -150,7 +378,7 @@ File a GitHub [issue](https://github.com/cloudopsworks/terraform-module-aws-vpc-
 
 ### Bug Reports & Feature Requests
 
-Please use the [issue tracker](https://github.com/cloudopsworks/terraform-module-aws-vpc-setup/issues) to report any bugs or file feature requests.
+Please use the [issue tracker](https://github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy/issues) to report any bugs or file feature requests.
 
 
 
@@ -215,30 +443,30 @@ This project is maintained by [Cloud Ops Works LLC][website].
 [![Beacon][beacon]][website]
 
   [logo]: https://cloudopsworks.co/images/main-logo.png
-  [docs]: https://cloudopsworks.co/resources?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=docs
-  [website]: https://cloudopsworks.co?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=website
-  [github]: https://cloudopsworks.co/github?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=github
-  [jobs]: https://cloudopsworks.co/jobs?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=jobs
-  [hire]: https://cloudopsworks.co/hire?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=hire
-  [slack]: https://cloudopsworks.co/slack?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=slack
-  [linkedin]: https://cloudopsworks.co/linkedin?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=linkedin
-  [x]: https://cloudopsworks.co/x?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=x
-  [testimonial]: https://cloudopsworks.co/case-studies?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=testimonial
-  [office_hours]: https://cloudopsworks.co/office-hours?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=office_hours
-  [newsletter]: https://cloudopsworks.co/resources?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=newsletter
-  [email]: https://cloudopsworks.co/contact?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=email
-  [commercial_support]: https://cloudopsworks.co/services?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=commercial_support
-  [we_love_open_source]: https://cloudopsworks.co/open-source?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=we_love_open_source
-  [terraform_modules]: https://cloudopsworks.co/open-source?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=terraform_modules
+  [docs]: https://cloudopsworks.co/resources?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=docs
+  [website]: https://cloudopsworks.co?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=website
+  [github]: https://cloudopsworks.co/github?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=github
+  [jobs]: https://cloudopsworks.co/jobs?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=jobs
+  [hire]: https://cloudopsworks.co/hire?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=hire
+  [slack]: https://cloudopsworks.co/slack?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=slack
+  [linkedin]: https://cloudopsworks.co/linkedin?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=linkedin
+  [x]: https://cloudopsworks.co/x?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=x
+  [testimonial]: https://cloudopsworks.co/case-studies?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=testimonial
+  [office_hours]: https://cloudopsworks.co/office-hours?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=office_hours
+  [newsletter]: https://cloudopsworks.co/resources?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=newsletter
+  [email]: https://cloudopsworks.co/contact?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=email
+  [commercial_support]: https://cloudopsworks.co/services?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=commercial_support
+  [we_love_open_source]: https://cloudopsworks.co/open-source?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=we_love_open_source
+  [terraform_modules]: https://cloudopsworks.co/open-source?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=terraform_modules
   [readme_header_img]: https://cloudopsworks.co/images/readme-header.png
-  [readme_header_link]: https://cloudopsworks.co/readme/header/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=readme_header_link
+  [readme_header_link]: https://cloudopsworks.co/readme/header/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=readme_header_link
   [readme_footer_img]: https://cloudopsworks.co/images/main-logo-footer.png
-  [readme_footer_link]: https://cloudopsworks.co/readme/footer/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=readme_footer_link
+  [readme_footer_link]: https://cloudopsworks.co/readme/footer/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=readme_footer_link
   [readme_commercial_support_img]: https://cloudopsworks.co/readme/commercial-support/img
-  [readme_commercial_support_link]: https://cloudopsworks.co/readme/commercial-support/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-vpc-setup&utm_content=readme_commercial_support_link
-  [share_twitter]: https://x.com/intent/tweet/?text=Terraform+Transit+Gateway+Module&url=https://github.com/cloudopsworks/terraform-module-aws-vpc-setup
-  [share_linkedin]: https://www.linkedin.com/shareArticle?mini=true&title=Terraform+Transit+Gateway+Module&url=https://github.com/cloudopsworks/terraform-module-aws-vpc-setup
-  [share_reddit]: https://reddit.com/submit/?url=https://github.com/cloudopsworks/terraform-module-aws-vpc-setup
-  [share_facebook]: https://facebook.com/sharer/sharer.php?u=https://github.com/cloudopsworks/terraform-module-aws-vpc-setup
-  [share_email]: mailto:?subject=Terraform+Transit+Gateway+Module&body=https://github.com/cloudopsworks/terraform-module-aws-vpc-setup
-  [beacon]: https://ga-beacon.cloudopsworks.co/G-QMZVYYN2VN/cloudopsworks/terraform-module-aws-vpc-setup?pixel&cs=github&cm=readme&an=terraform-module-aws-vpc-setup
+  [readme_commercial_support_link]: https://cloudopsworks.co/readme/commercial-support/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-eks-helm-deploy&utm_content=readme_commercial_support_link
+  [share_twitter]: https://x.com/intent/tweet/?text=Terraform+AWS+EKS+Helm+Deploy+Module&url=https://github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy
+  [share_linkedin]: https://www.linkedin.com/shareArticle?mini=true&title=Terraform+AWS+EKS+Helm+Deploy+Module&url=https://github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy
+  [share_reddit]: https://reddit.com/submit/?url=https://github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy
+  [share_facebook]: https://facebook.com/sharer/sharer.php?u=https://github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy
+  [share_email]: mailto:?subject=Terraform+AWS+EKS+Helm+Deploy+Module&body=https://github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy
+  [beacon]: https://ga-beacon.cloudopsworks.co/G-QMZVYYN2VN/cloudopsworks/terraform-module-aws-eks-helm-deploy?pixel&cs=github&cm=readme&an=terraform-module-aws-eks-helm-deploy

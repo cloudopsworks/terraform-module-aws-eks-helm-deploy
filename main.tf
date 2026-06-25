@@ -1,5 +1,5 @@
 ##
-# (c) 2021-2025
+# (c) 2021-2026
 #     Cloud Ops Works LLC - https://cloudops.works/
 #     Find us on:
 #       GitHub: https://github.com/cloudopsworks
@@ -79,6 +79,7 @@ resource "helm_release" "repo" {
   create_namespace = var.create_namespace
   version          = startswith(var.helm_repo_url, "oci") || local.release_version == "NA" ? null : local.release_version
   wait             = true
+  timeout          = var.timeout
 
   values = [
     file("${var.absolute_path}/${var.values_file}")
@@ -110,6 +111,7 @@ resource "helm_release" "default" {
   namespace        = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
   create_namespace = var.create_namespace
   wait             = true
+  timeout          = var.timeout
 
   values = [
     file(var.values_file)

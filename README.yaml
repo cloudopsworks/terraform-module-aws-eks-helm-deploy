@@ -1,5 +1,12 @@
-name: Terraform Transit Gateway Module
+name: Terraform AWS EKS Helm Deploy Module
 #logo: logo/logo.jpg
+badges:
+  - name: Latest Release
+    image: https://img.shields.io/github/release/cloudopsworks/terraform-module-aws-eks-helm-deploy.svg?style=for-the-badge
+    url: https://github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy/releases/latest
+  - name: Last Updated
+    image: https://img.shields.io/github/last-commit/cloudopsworks/terraform-module-aws-eks-helm-deploy.svg?style=for-the-badge
+    url: https://github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy/commits
 
 license: "APACHE2"
 
@@ -8,23 +15,234 @@ copyrights:
     url: "https://cloudops.works"
     year: "2024"
 
-github_repo: cloudopsworks/terraform-module-aws-vpc-setup
+github_repo: cloudopsworks/terraform-module-aws-eks-helm-deploy
 
 description: |-
-  VPC Module for setting up transit gateway with ResourceAccessMananger support.
+  Terraform module for deploying Helm releases into AWS EKS clusters with optional namespace creation, ConfigMap and Secret file injection, AWS Secrets Manager integration, and External Secrets Operator manifests.
 
 # Introduction to the project
-#introduction: |-
-#  This is an introduction.
+introduction: |-
+  This module standardizes application deployment into Amazon EKS through the Helm provider. It supports both repository-backed charts and local charts, applies common Cloud Ops Works tags, can create or reuse target namespaces, and can inject configuration or secret material into charts through generated Helm value overrides.
+
+  The module can pull AWS Secrets Manager values directly into Kubernetes Secrets or render External Secrets Operator resources when the cluster already runs the operator. Terragrunt scaffolding is included to wire the module to an upstream EKS dependency and to generate Kubernetes and Helm providers from the EKS cluster outputs.
 
 # How to use this project
-#usage: |-
+usage: |-
+  ## Terragrunt scaffolding workflow
+
+  Create the target deployment directory first, then run `terragrunt scaffold` from that directory. Do not use `--working-dir`; scaffold writes into the current directory.
+
+  ```sh
+  # 1. Create and enter the target deployment directory
+  mkdir -p live/prod/us-east-1/app/helm-deploy
+  cd live/prod/us-east-1/app/helm-deploy
+
+  # 2. Scaffold the module
+  terragrunt scaffold github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy
+
+  # 3. Edit inputs.yaml with deployment-specific values
+  vi inputs.yaml
+
+  # 4. Apply
+  terragrunt apply
+  ```
+
+  During scaffolding, provide the EKS dependency path when prompted. The default is `../eks`; the dependency must expose at least `cluster_name` for provider generation.
+
+  ## Generated `inputs.yaml`
+
+  The scaffold copies `.boilerplate/inputs.yaml` so operators can configure the deployment without reading Terraform source:
+
+  ```yaml
+  # Module configuration
+  namespace: "apps" # (Required) Kubernetes namespace where the Helm release and optional Kubernetes resources are managed.
+
+  release: # (Required) Helm release metadata used by resources and labels. Default: {}.
+    name: "my-app" # (Required) Helm release name.
+    version: "1.0.0" # (Optional) Application/chart version used for local chart labels and remote chart version when release.source.version is unset. Default: "".
+    source: # (Optional) Source metadata for remote chart deployments. Default: {}.
+      version: "1.0.0" # (Optional) Helm chart version for repository-backed releases; takes precedence over release.version. Default: "".
+
+  helm_repo_url: "" # (Optional) Helm repository URL. Leave empty to deploy a local chart from helm_chart_path or absolute_path/helm/charts. OCI repositories are supported. Default: "".
+  helm_chart_name: "" # (Optional) Chart name to install when helm_repo_url is set. Default: "".
+  helm_chart_path: "" # (Optional) Local chart path used when helm_repo_url is empty; defaults to absolute_path/helm/charts when empty. Default: "".
+  values_file: "values.yaml" # (Required) Values file path. Repository-backed charts are read from absolute_path/values_file; local charts use the path as provided.
+
+  values_overrides: {} # (Optional) Helm set overrides merged with secret/config mount overrides. Values are sent as string set entries. Default: {}.
+  #  image.tag: "1.0.0" # (Optional) Example Helm value override key and value.
+
+  absolute_path: "." # (Optional) Base path for values and injected file folders. Default: ".".
+
+  config_map: # (Optional) ConfigMap file injection settings. Default: {}.
+    enabled: false # (Optional) Create a ConfigMap from files under absolute_path/values/files_path. Default: false.
+    files_path: "config" # (Optional) Folder below absolute_path/values containing ConfigMap files. Default: "".
+    mount_point: "/config" # (Optional) Pod mount path injected through Helm overrides. Default: "".
+
+  secret_files: # (Optional) Secret file injection settings. Files are rendered as templates with pulled Secrets Manager values. Default: {}.
+    enabled: false # (Optional) Create a Kubernetes Secret from files under absolute_path/values/files_path. Default: false.
+    files_path: "secrets" # (Optional) Folder below absolute_path/values containing secret templates. Default: "".
+    mount_point: "/secrets" # (Optional) Pod mount path injected through Helm overrides. Default: "".
+
+  secrets: # (Optional) AWS Secrets Manager pull and External Secrets Operator settings. Default: {}.
+    secrets_path_filter: [] # (Optional) List of AWS Secrets Manager name filters/prefixes to read. Default: [].
+    external_secrets: # (Optional) External Secrets Operator configuration. Default: {}.
+      enabled: false # (Optional) Create an ExternalSecret instead of a native Kubernetes Secret. Default: false.
+      create_store: false # (Optional) Create a SecretStore in the target namespace. Default: false.
+      store_name: "external-secrets-store" # (Optional) Existing SecretStore name when create_store is false. Default: "".
+      refresh_interval: "1h" # (Optional) ExternalSecret refresh interval for Periodic refreshPolicy. Default: "1h".
+      on_change: false # (Optional) Use OnChange refreshPolicy instead of Periodic. Default: false.
+
+  create_namespace: false # (Optional) Create the Kubernetes namespace when true; otherwise the namespace must already exist. Default: false.
+  namespace_annotations: {} # (Optional) Annotations applied to the namespace when create_namespace is true. Default: {}.
+  #  example.com/owner: "platform"
+  timeout: 300 # (Optional) Timeout in seconds for Helm release operations. Default: 300.
+  ```
+
+  ## Generated `terragrunt.hcl`
+
+  The rendered Terragrunt file loads `inputs.yaml` as `local.local_vars`, reads hierarchy metadata, wires the upstream EKS dependency into generated providers, and maps module variables into Terraform inputs:
+
+  ```hcl
+  locals {
+    local_vars  = yamldecode(file("./inputs.yaml"))
+    spoke_vars  = yamldecode(file(find_in_parent_folders("spoke-inputs.yaml")))
+    region_vars = yamldecode(file(find_in_parent_folders("region-inputs.yaml")))
+    env_vars    = yamldecode(file(find_in_parent_folders("env-inputs.yaml")))
+    global_vars = yamldecode(file(find_in_parent_folders("global-inputs.yaml")))
+
+    local_tags  = jsondecode(file("./local-tags.json"))
+    spoke_tags  = jsondecode(file(find_in_parent_folders("spoke-tags.json")))
+    region_tags = jsondecode(file(find_in_parent_folders("region-tags.json")))
+    env_tags    = jsondecode(file(find_in_parent_folders("env-tags.json")))
+    global_tags = jsondecode(file(find_in_parent_folders("global-tags.json")))
+
+    tags = merge(
+      local.global_tags,
+      local.env_tags,
+      local.region_tags,
+      local.spoke_tags,
+      local.local_tags
+    )
+  }
+
+  include "root" {
+    path = find_in_parent_folders("root.hcl")
+  }
+
+  dependency "eks" {
+    config_path = "../eks"
+    mock_outputs_allowed_terraform_commands = ["validate", "destroy"]
+    mock_outputs = {
+      cluster_name = "eks-cluster"
+      lb_irsa_role = {
+        arn  = "arn:aws:iam::123456789012:role/eks-lb-irsa-role"
+        name = "eks-lb-irsa-role"
+      }
+    }
+  }
+
+  generate "kubernetes_provider" {
+    path      = "provider.l.tf"
+    if_exists = "overwrite_terragrunt"
+    contents  = <<EOF
+  data "aws_eks_cluster" "cluster" {
+    name = "${dependency.eks.outputs.cluster_name}"
+  }
+
+  data "aws_eks_cluster_auth" "cluster" {
+    name = "${dependency.eks.outputs.cluster_name}"
+  }
+
+  provider "kubernetes" {
+    host                   = data.aws_eks_cluster.cluster.endpoint
+    cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority.0.data)
+    token                  = data.aws_eks_cluster_auth.cluster.token
+  }
+
+  provider "helm" {
+    kubernetes = {
+      host                   = data.aws_eks_cluster.cluster.endpoint
+      cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority.0.data)
+      token                  = data.aws_eks_cluster_auth.cluster.token
+    }
+  }
+  EOF
+  }
+
+  terraform {
+    source = "github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy"
+  }
+
+  inputs = {
+    is_hub                = false
+    org                   = local.env_vars.org
+    spoke_def             = local.spoke_vars.spoke_def
+    namespace             = local.local_vars.namespace
+    values_file           = local.local_vars.values_file
+    release               = try(local.local_vars.release, {})
+    helm_repo_url         = try(local.local_vars.helm_repo_url, "")
+    helm_chart_name       = try(local.local_vars.helm_chart_name, "")
+    helm_chart_path       = try(local.local_vars.helm_chart_path, "")
+    values_overrides      = try(local.local_vars.values_overrides, {})
+    absolute_path         = try(local.local_vars.absolute_path, ".")
+    config_map            = try(local.local_vars.config_map, {})
+    secret_files          = try(local.local_vars.secret_files, {})
+    secrets               = try(local.local_vars.secrets, {})
+    create_namespace      = try(local.local_vars.create_namespace, false)
+    namespace_annotations = try(local.local_vars.namespace_annotations, {})
+    timeout               = try(local.local_vars.timeout, 300)
+    extra_tags            = local.tags
+  }
+  ```
 
 # Example usage
-#examples: |-
+examples: |-
+  ## Repository-backed chart
+
+  ```yaml
+  namespace: "ingress-nginx"
+  release:
+    name: "ingress-nginx"
+    source:
+      version: "4.11.3"
+  helm_repo_url: "https://kubernetes.github.io/ingress-nginx"
+  helm_chart_name: "ingress-nginx"
+  values_file: "values.yaml"
+  create_namespace: true
+  timeout: 600
+  ```
+
+  ## Local chart with injected config and AWS secrets
+
+  ```yaml
+  namespace: "apps"
+  release:
+    name: "orders-api"
+    version: "1.4.0"
+  helm_chart_path: "./helm/charts/orders-api"
+  values_file: "./values.yaml"
+  config_map:
+    enabled: true
+    files_path: "config"
+    mount_point: "/app/config"
+  secret_files:
+    enabled: true
+    files_path: "secret-templates"
+    mount_point: "/app/secrets"
+  secrets:
+    secrets_path_filter:
+      - "/platform/prod/orders-api"
+  values_overrides:
+    image.tag: "1.4.0"
+  ```
 
 # How to get started quickly
-#quickstart: |-
+quickstart: |-
+  1. Ensure an EKS Terragrunt module exists in the same live hierarchy and exposes `cluster_name`.
+  2. Scaffold this module into the target application directory with `terragrunt scaffold github.com/cloudopsworks/terraform-module-aws-eks-helm-deploy`.
+  3. Edit `inputs.yaml`: set `namespace`, `release.name`, `values_file`, and either repository chart fields (`helm_repo_url` plus `helm_chart_name`) or `helm_chart_path` for a local chart.
+  4. Add optional `config_map`, `secret_files`, `secrets`, and `timeout` settings as needed.
+  5. Run `terragrunt validate`, then `terragrunt apply`.
 
 include:
   - "docs/targets.md"

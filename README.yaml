@@ -30,32 +30,31 @@ introduction: |-
 
   | Component | Version constraint | Notes |
   |-----------|--------------------|-------|
-  | Terraform / OpenTofu | `>= 1.10` | Moving a resource to a different type (`moved.tf`) needs Terraform >= 1.8 or OpenTofu >= 1.10. |
+  | Terraform / OpenTofu | `>= 1.11.12, != 1.12.0, != 1.12.1, != 1.12.2, != 1.12.3` | The namespace state move in `moved.tf` needs Terraform >= 1.8, or an OpenTofu release that sends the full provider address in state-move requests (1.11.12+, 1.12.4+, 1.13+). Older OpenTofu releases fail with `Unable to Move Resource State`. |
   | `hashicorp/aws` | `~> 6.35` | Reads AWS Secrets Manager values and EKS cluster data. |
-  | `hashicorp/kubernetes` | `~> 3.5` | Uses the versioned `*_v1` resources (`kubernetes_namespace_v1`, `kubernetes_config_map_v1`, `kubernetes_secret_v1`). |
+  | `hashicorp/kubernetes` | `~> 3.5` | Namespaces use `kubernetes_namespace_v1`. ConfigMaps and Secrets stay on the deprecated `kubernetes_config_map` / `kubernetes_secret` types, because their `*_v1` resources cannot take moved state yet. |
   | `hashicorp/helm` | `~> 3.1` | Provider block uses the 3.x object syntax (`kubernetes = { ... }`). |
 
   ## Upgrading to v6.x (breaking)
 
-  v6.0.0 replaces the deprecated unversioned Kubernetes resources with their `*_v1` equivalents. The Kubernetes provider can only move existing state into the `*_v1` types once that state has been written by provider 3.x, so **the upgrade has to go in order**:
+  v6.0.0 moves the target namespace from the deprecated `kubernetes_namespace` resource to `kubernetes_namespace_v1`. The `moved` block in `moved.tf` migrates existing state in place, and you can upgrade straight from any v5.x release:
 
-  | Step | Module version | Action |
-  |------|----------------|--------|
-  | 1 | `v5.10.x` | Upgrades the Kubernetes provider to `~> 3.5` and Helm to `~> 3.1` but keeps the old resource types. Run `terragrunt init -upgrade` and `terragrunt apply` on **every** deployment so its state is rewritten by provider 3.x. Deprecation warnings at this step are expected. |
-  | 2 | `v6.0.x` | Moves state to the `*_v1` resource types through the `moved` blocks in `moved.tf`. Run `terragrunt init -upgrade`, then check that `terragrunt plan` shows only moves and no destroy or replace before you apply. |
+  1. Make sure your Terraform or OpenTofu version meets the constraint above. The OpenTofu version bounds in `root.hcl` (`terraform_version_constraint`) must allow it too.
+  2. Run `terragrunt init -upgrade` to install Kubernetes provider `~> 3.5` and Helm `~> 3.1`.
+  3. Run `terragrunt plan` and confirm that the only change is the namespace move, with nothing destroyed or replaced:
 
-  Do not jump straight from `v5.9.x` or earlier to `v6.x`: the state moves fail for state written by Kubernetes provider 2.x.
+     ```text
+     # kubernetes_namespace.this[0] has moved to kubernetes_namespace_v1.this[0]
+     Plan: 0 to add, 0 to change, 0 to destroy.
+     ```
 
-  State address changes in v6.0.0:
+  4. Run `terragrunt apply`.
 
   | Previous address | New address |
   |------------------|-------------|
   | `kubernetes_namespace.this` | `kubernetes_namespace_v1.this` |
-  | `kubernetes_config_map.config_map` | `kubernetes_config_map_v1.config_map` |
-  | `kubernetes_secret.secrets` | `kubernetes_secret_v1.secrets` |
-  | `kubernetes_secret.secret_files` | `kubernetes_secret_v1.secret_files` |
 
-  The `kubernetes_namespace` data source is now `kubernetes_namespace_v1`. Module inputs and outputs are unchanged.
+  The `kubernetes_namespace` data source is now `kubernetes_namespace_v1`. `kubernetes_config_map.config_map`, `kubernetes_secret.secrets` and `kubernetes_secret.secret_files` keep their addresses. They still work under provider 3.x but show deprecation warnings, and will move to `*_v1` in a later release once the provider supports state moves for them. Module inputs and outputs are unchanged.
 
 # How to use this project
 usage: |-
@@ -274,7 +273,7 @@ quickstart: |-
   3. Edit `inputs.yaml`: set `namespace`, `release.name`, `values_file`, and either repository chart fields (`helm_repo_url` plus `helm_chart_name`) or `helm_chart_path` for a local chart.
   4. Add optional `config_map`, `secret_files`, `secrets`, and `timeout` settings as needed.
   5. Run `terragrunt validate`, then `terragrunt apply`.
-  6. For an existing deployment on module `v5.9.x` or earlier, apply `v5.10.x` first, then upgrade to `v6.x` (see **Upgrading to v6.x**).
+  6. For an existing deployment on module v5.x, check the Terraform/OpenTofu version requirement and the plan output described in **Upgrading to v6.x**.
 
 include:
   - "docs/targets.md"

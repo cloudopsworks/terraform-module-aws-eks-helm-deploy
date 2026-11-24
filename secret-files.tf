@@ -29,7 +29,7 @@ locals {
   ) : {}
 }
 
-resource "kubernetes_secret_v1" "secret_files" {
+resource "kubernetes_secret" "secret_files" {
   count = try(var.secret_files.enabled, false) == true && length(local.secret_files_in_config_path) > 0 ? 1 : 0
   metadata {
     name      = "${var.release.name}-injected-secret-files"

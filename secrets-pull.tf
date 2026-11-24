@@ -56,7 +56,7 @@ data "aws_secretsmanager_secret_version" "secret" {
   secret_id = each.value.secret_name
 }
 
-resource "kubernetes_secret_v1" "secrets" {
+resource "kubernetes_secret" "secrets" {
   count = length(local.secrets_path_filter) > 0 && !local.external_secrets_enabled ? 1 : 0
   metadata {
     name      = "${var.release.name}-injected-secrets"

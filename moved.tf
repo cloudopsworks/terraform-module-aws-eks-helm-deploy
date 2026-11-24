@@ -7,23 +7,10 @@
 #     Distributed Under Apache v2.0 License
 #
 
-moved {
-  from = kubernetes_config_map.config_map
-  to   = kubernetes_config_map_v1.config_map
-}
-
+# Only kubernetes_namespace_v1 supports moving state from the deprecated type in
+# hashicorp/kubernetes 3.5.x. kubernetes_config_map and kubernetes_secret stay on the
+# deprecated types until their *_v1 resources support state moves.
 moved {
   from = kubernetes_namespace.this
   to   = kubernetes_namespace_v1.this
 }
-
-moved {
-  from = kubernetes_secret.secret_files
-  to   = kubernetes_secret_v1.secret_files
-}
-
-moved {
-  from = kubernetes_secret.secrets
-  to   = kubernetes_secret_v1.secrets
-}
-

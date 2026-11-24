@@ -21,7 +21,7 @@ locals {
   } : {}
 }
 
-resource "kubernetes_config_map_v1" "config_map" {
+resource "kubernetes_config_map" "config_map" {
   count = try(var.config_map.enabled, false) == true && length(local.files_in_config_path) > 0 ? 1 : 0
   metadata {
     name      = "${var.release.name}-injected-cm"

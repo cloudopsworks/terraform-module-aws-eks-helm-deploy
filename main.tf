@@ -14,7 +14,7 @@ locals {
   secrets_overrides = length(local.secrets_path_filter) > 0 ? (local.external_secrets_enabled ? {
     "injectEnvFrom[0].secretRef.name" = kubernetes_manifest.external_secret[0].object.metadata.name
     } : {
-    "injectEnvFrom[0].secretRef.name" = kubernetes_secret_v1.secrets[0].metadata[0].name
+    "injectEnvFrom[0].secretRef.name" = kubernetes_secret.secrets[0].metadata[0].name
     }
   ) : {}
   all_overrides   = merge(var.values_overrides, local.secrets_overrides, local.mount_overrides, local.secret_mount_overrides)

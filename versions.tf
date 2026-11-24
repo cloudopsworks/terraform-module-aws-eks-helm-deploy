@@ -8,7 +8,7 @@
 #
 
 terraform {
-  required_version = ">= 1.10"
+  required_version = ">= 1.11.12, != 1.12.0, != 1.12.1, != 1.12.2, != 1.12.3"
   # Complete with required providers for the module
   required_providers {
     aws = {

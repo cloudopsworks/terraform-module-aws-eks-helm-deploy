@@ -21,11 +21,11 @@ locals {
   } : {}
 }
 
-resource "kubernetes_config_map" "config_map" {
+resource "kubernetes_config_map_v1" "config_map" {
   count = try(var.config_map.enabled, false) == true && length(local.files_in_config_path) > 0 ? 1 : 0
   metadata {
     name      = "${var.release.name}-injected-cm"
-    namespace = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
+    namespace = var.create_namespace ? kubernetes_namespace_v1.this[0].metadata.0.name : data.kubernetes_namespace_v1.this[0].metadata.0.name
     labels = {
       "app.kubernetes.io/name"       = var.release.name
       "app.kubernetes.io/version"    = local.release_version

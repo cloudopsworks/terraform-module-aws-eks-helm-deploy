@@ -26,6 +26,27 @@ introduction: |-
 
   The module can pull AWS Secrets Manager values directly into Kubernetes Secrets or render External Secrets Operator resources when the cluster already runs the operator. Terragrunt scaffolding is included to wire the module to an upstream EKS dependency and to generate Kubernetes and Helm providers from the EKS cluster outputs.
 
+  ## Provider requirements
+
+  | Provider | Version constraint | Notes |
+  |----------|--------------------|-------|
+  | `hashicorp/aws` | `~> 6.35` | Reads AWS Secrets Manager values and EKS cluster data. |
+  | `hashicorp/kubernetes` | `~> 3.5` | Uses the versioned `*_v1` resources (`kubernetes_namespace_v1`, `kubernetes_config_map_v1`, `kubernetes_secret_v1`). |
+  | `hashicorp/helm` | `~> 3.1` | Provider block uses the 3.x object syntax (`kubernetes = { ... }`). |
+
+  ## Upgrading from earlier releases
+
+  This release moves the module to Kubernetes provider 3.x and Helm provider 3.1. The deprecated unversioned Kubernetes resources were replaced by their `*_v1` equivalents, and `moved.tf` declares `moved` blocks so existing state migrates in place on the next plan or apply. No resources are destroyed or recreated:
+
+  | Previous address | New address |
+  |------------------|-------------|
+  | `kubernetes_namespace.this` | `kubernetes_namespace_v1.this` |
+  | `kubernetes_config_map.config_map` | `kubernetes_config_map_v1.config_map` |
+  | `kubernetes_secret.secrets` | `kubernetes_secret_v1.secrets` |
+  | `kubernetes_secret.secret_files` | `kubernetes_secret_v1.secret_files` |
+
+  The `kubernetes_namespace` data source is now `kubernetes_namespace_v1`. Run `terragrunt init -upgrade` so the newer provider versions are installed, then check that `terragrunt plan` shows only moves and no replacements.
+
 # How to use this project
 usage: |-
   ## Terragrunt scaffolding workflow

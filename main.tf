@@ -23,7 +23,7 @@ locals {
   release_version = coalesce(local.source_version, local.app_version, "NA")
 }
 
-resource "kubernetes_namespace" "this" {
+resource "kubernetes_namespace_v1" "this" {
   count = var.create_namespace ? 1 : 0
   metadata {
     name = var.namespace
@@ -42,7 +42,7 @@ resource "kubernetes_labels" "this" {
   kind        = "Namespace"
   force       = true
   metadata {
-    name = kubernetes_namespace.this[count.index].metadata[0].name
+    name = kubernetes_namespace_v1.this[count.index].metadata[0].name
   }
   labels = {
     "app.kubernetes.io/name"       = var.release.name
@@ -57,13 +57,13 @@ resource "kubernetes_annotations" "this" {
   kind        = "Namespace"
   force       = true
   metadata {
-    name = kubernetes_namespace.this[count.index].metadata[0].name
+    name = kubernetes_namespace_v1.this[count.index].metadata[0].name
   }
   annotations = var.namespace_annotations
 }
 
 
-data "kubernetes_namespace" "this" {
+data "kubernetes_namespace_v1" "this" {
   count = var.create_namespace ? 0 : 1
   metadata {
     name = var.namespace
@@ -75,7 +75,7 @@ resource "helm_release" "repo" {
   name             = var.release.name
   chart            = var.helm_chart_name
   repository       = var.helm_repo_url
-  namespace        = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
+  namespace        = var.create_namespace ? kubernetes_namespace_v1.this[0].metadata.0.name : data.kubernetes_namespace_v1.this[0].metadata.0.name
   create_namespace = var.create_namespace
   version          = startswith(var.helm_repo_url, "oci") || local.release_version == "NA" ? null : local.release_version
   wait             = true
@@ -108,7 +108,7 @@ resource "helm_release" "default" {
   count            = var.helm_repo_url == "" ? 1 : 0
   name             = var.release.name
   chart            = var.helm_chart_path == "" ? "${var.absolute_path}/helm/charts" : var.helm_chart_path
-  namespace        = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
+  namespace        = var.create_namespace ? kubernetes_namespace_v1.this[0].metadata.0.name : data.kubernetes_namespace_v1.this[0].metadata.0.name
   create_namespace = var.create_namespace
   wait             = true
   timeout          = var.timeout

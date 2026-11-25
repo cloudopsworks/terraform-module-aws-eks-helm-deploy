@@ -33,7 +33,7 @@ resource "kubernetes_secret" "secret_files" {
   count = try(var.secret_files.enabled, false) == true && length(local.secret_files_in_config_path) > 0 ? 1 : 0
   metadata {
     name      = "${var.release.name}-injected-secret-files"
-    namespace = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
+    namespace = var.create_namespace ? kubernetes_namespace_v1.this[0].metadata.0.name : data.kubernetes_namespace_v1.this[0].metadata.0.name
     labels = {
       "app.kubernetes.io/name"       = var.release.name
       "app.kubernetes.io/version"    = local.release_version

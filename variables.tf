@@ -7,16 +7,16 @@
 #     Distributed Under Apache v2.0 License
 #
 
-# is_hub: false # (Optional) Indicates whether this deployment belongs to a hub configuration. Default: false.
+# is_hub: false # (Optional) Is this a hub or spoke configuration? Default: false
 variable "is_hub" {
-  description = "Indicates whether this deployment belongs to a hub configuration."
+  description = "Is this a hub or spoke configuration?"
   type        = bool
   default     = false
 }
 
-# spoke_def: "001" # (Optional) Three-digit spoke identifier used in generated names. Default: "001".
+# spoke_def: "001" # (Optional) Spoke ID Number, must be a 3 digit number. Default: "001"
 variable "spoke_def" {
-  description = "Three-digit spoke identifier used in generated names."
+  description = "Spoke ID Number, must be a 3 digit number"
   type        = string
   default     = "001"
   validation {
@@ -25,13 +25,13 @@ variable "spoke_def" {
   }
 }
 
-# org: # (Required) Organization context used by naming and tagging.
-#   organization_name: "Example Organization" # (Required) Full organization name.
-#   organization_unit: "platform"             # (Required) Organization unit or team name used in resource names.
-#   environment_type: "prod"                  # (Required) Environment type such as dev, stage, prod, or shared.
-#   environment_name: "primary"               # (Required) Environment name used in resource names and tags.
+# org: # (Required) Organization details
+#   organization_name: "example" # (Required) The name of the organization
+#   organization_unit: "devops"  # (Required) The unit within the organization
+#   environment_type: "production" # (Required) The type of environment (e.g. production, staging)
+#   environment_name: "prod"      # (Required) The name of the environment
 variable "org" {
-  description = "Organization context used by naming and tagging."
+  description = "Organization details"
   type = object({
     organization_name = string
     organization_unit = string
@@ -40,10 +40,10 @@ variable "org" {
   })
 }
 
-# extra_tags: {} # (Optional) Additional tags merged with generated Cloud Ops Works common tags. Default: {}.
-#   CostCenter: "platform"
+# extra_tags: # (Optional) Extra tags to add to the resources. Default: {}
+#   Tag1: "Value1"
 variable "extra_tags" {
-  description = "Additional tags merged with generated Cloud Ops Works common tags."
+  description = "Extra tags to add to the resources"
   type        = map(string)
   default     = {}
 }

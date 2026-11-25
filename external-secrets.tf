@@ -41,7 +41,7 @@ resource "kubernetes_manifest" "external_secret_store" {
     kind       = "SecretStore"
     metadata = {
       name      = "${var.release.name}-external-secret-store"
-      namespace = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
+      namespace = var.create_namespace ? kubernetes_namespace_v1.this[0].metadata.0.name : data.kubernetes_namespace_v1.this[0].metadata.0.name
     }
     spec = {
       provider = {
@@ -61,7 +61,7 @@ resource "kubernetes_manifest" "external_secret" {
     kind       = "ExternalSecret"
     metadata = {
       name      = "${var.release.name}-external-secret"
-      namespace = var.create_namespace ? kubernetes_namespace.this[0].metadata.0.name : data.kubernetes_namespace.this[0].metadata.0.name
+      namespace = var.create_namespace ? kubernetes_namespace_v1.this[0].metadata.0.name : data.kubernetes_namespace_v1.this[0].metadata.0.name
     }
     spec = {
       refreshPolicy   = try(var.secrets.external_secrets.on_change, false) ? "OnChange" : "Periodic"
